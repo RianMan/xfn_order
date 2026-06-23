@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ADMIN_PASSWORD, ADMIN_USER } from "./config.js";
 import { uploadBuffer } from "./cos.js";
-import { fetchThirdPartyOrders } from "./importer.js";
+import { fetchThirdPartyOrderPages, fetchThirdPartyOrders } from "./importer.js";
 import { parseAfterSalesOrders } from "./parser.js";
 import {
   claimNextOrder,
@@ -142,9 +142,9 @@ app.post("/api/admin/staff", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/admin/import", requireAdmin, async (req, res) => {
-  const { orders } = await fetchThirdPartyOrders(req.body ?? {});
+  const { orders, pages, stoppedReason } = await fetchThirdPartyOrderPages(req.body ?? {});
   const result = await importOrders(orders);
-  res.json({ ...result, imported: orders.length });
+  res.json({ ...result, imported: orders.length, pages, stoppedReason });
 });
 
 app.post("/api/admin/import-html", requireAdmin, async (req, res) => {

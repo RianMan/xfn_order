@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
+import { fetchThirdPartyOrderPages } from "./importer.js";
 import { parseAfterSalesOrders, maskShopName } from "./parser.js";
 
 const sample = await readFile(
@@ -51,5 +52,25 @@ const resendHtml = `
 const resendOrders = parseAfterSalesOrders(resendHtml);
 assert.equal(resendOrders.length, 1);
 assert.equal(resendOrders[0].refundInfo, "补寄");
+
+const originalFetch = globalThis.fetch;
+globalThis.fetch = async (_url, options) => {
+  const page = new URLSearchParams(options.body).get("p");
+  return {
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    text: async () => (page === "1" ? resendHtml : "<table></table>")
+  };
+};
+
+const paged = await fetchThirdPartyOrderPages({ p: "1", fenyei: "50", maxPages: "5" });
+assert.equal(paged.orders.length, 1);
+assert.deepEqual(paged.pages, [
+  { page: 1, count: 1 },
+  { page: 2, count: 0 }
+]);
+assert.equal(paged.stoppedReason, "empty_page");
+globalThis.fetch = originalFetch;
 
 console.log(`parser ok: ${orders.length} orders`);

@@ -29,6 +29,11 @@ const { TextArea } = Input;
 const ADDRESS_OPTIONS = ["厂家", "潜山"];
 const SHIPPED_OPTIONS = ["未寄出", "已寄出"];
 const PROCESS_OPTIONS = ["未处理", "已回款", "联系中", "加好友中"];
+const SYNC_STOP_TEXT = {
+  empty_page: "空页停止",
+  old_data: "遇到旧数据停止",
+  max_pages: "达到最大页数停止"
+};
 
 const route = ref(location.hash || "#/admin");
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
@@ -310,7 +315,9 @@ async function syncOrders() {
       method: "POST",
       body: JSON.stringify(importParams)
     });
-    antMessage.success(`新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}`);
+    antMessage.success(
+      `翻页 ${data.pages?.length || 0} 页，${SYNC_STOP_TEXT[data.stoppedReason] || "同步完成"}；新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}`
+    );
     await loadOrders();
   } catch (err) {
     antMessage.error(err.message);
