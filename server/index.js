@@ -21,7 +21,7 @@ import {
 import { createStaff, readStaff, verifyStaff } from "./staffStore.js";
 
 const app = express();
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.PORT ?? 7642);
 const sessionPath = path.resolve("data/sessions.json");
 const { sessions, staffSessions } = loadSessions();
 const upload = multer({
