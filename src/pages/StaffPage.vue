@@ -24,6 +24,7 @@ const staff = ref(readStoredStaff());
 const staffLoggedIn = ref(Boolean(localStorage.getItem("staffToken") && staff.value));
 const staffOrders = ref([]);
 const claimableOrders = ref([]);
+const previewImage = ref("");
 
 function staffHeaders() {
   const token = localStorage.getItem("staffToken");
@@ -201,6 +202,14 @@ async function removeStaffScreenshot(record, field, url) {
   await saveStaffOrder(record, { includeRemark: false, silent: true });
 }
 
+function openPreview(url) {
+  previewImage.value = url;
+}
+
+function closePreview() {
+  previewImage.value = "";
+}
+
 function copy(value) {
   const text = String(value ?? "");
   if (!text) return;
@@ -352,13 +361,22 @@ if (staffLoggedIn.value) loadStaffOrders();
               <div>
                 <span>收款截图</span>
                 <div class="inline-shots">
-                  <a v-for="url in order.paymentScreenshots" :key="url" :href="url" target="_blank">
+                  <a v-for="url in order.paymentScreenshots" :key="url" href="#" @click.prevent="openPreview(url)">
                     <img :src="url" alt="收款截图" />
-                    <button @click.prevent="removeStaffScreenshot(order, 'paymentScreenshots', url)">移除</button>
+                    <button @click.prevent.stop="removeStaffScreenshot(order, 'paymentScreenshots', url)">移除</button>
                   </a>
                   <Upload :before-upload="file => uploadStaffScreenshot(order, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
                     <button class="staff-upload-btn">上传</button>
                   </Upload>
+                </div>
+              </div>
+              <div>
+                <span>其他截图</span>
+                <div class="inline-shots">
+                  <a v-for="url in order.otherScreenshots" :key="url" href="#" @click.prevent="openPreview(url)">
+                    <img :src="url" alt="其他截图" />
+                  </a>
+                  <em v-if="!(order.otherScreenshots || []).length" class="staff-shot-empty">暂无其他截图</em>
                 </div>
               </div>
             </div>
@@ -380,5 +398,10 @@ if (staffLoggedIn.value) loadStaffOrders();
         </button>
       </div>
     </section>
+
+    <button v-if="previewImage" type="button" class="staff-image-preview" @click="closePreview">
+      <img :src="previewImage" alt="截图预览" />
+      <span>点击关闭</span>
+    </button>
   </main>
 </template>
