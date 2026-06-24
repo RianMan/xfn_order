@@ -146,6 +146,11 @@ body {
   min-height: 56px;
 }
 
+.admin-mobile-orders,
+.admin-mobile-staff-list {
+  display: none;
+}
+
 .order-block {
   display: grid;
   gap: 3px;
@@ -503,6 +508,114 @@ body {
   text-align: center;
 }
 
+.admin-order-card,
+.admin-staff-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  padding: 12px;
+}
+
+.admin-card-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-card-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-card-head span,
+.admin-card-info span,
+.admin-mobile-form label,
+.admin-shot-section > span,
+.admin-staff-card span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-card-head strong {
+  color: #0f172a;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.admin-copy-order {
+  background: transparent;
+  border: 0;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+}
+
+.admin-card-info,
+.admin-mobile-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-card-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 8px 0;
+  padding: 10px;
+}
+
+.admin-card-info div,
+.admin-mobile-form label,
+.admin-shot-section,
+.admin-staff-card {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-card-info b {
+  color: #0f172a;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.admin-mobile-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-mobile-form .ant-select,
+.admin-mobile-form .ant-input,
+.admin-mobile-form .ant-input-affix-wrapper,
+.admin-mobile-form textarea {
+  width: 100%;
+}
+
+.admin-shot-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.admin-mobile-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.admin-staff-card strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
 @media (max-width: 960px) {
   .top-nav {
     align-items: stretch;
@@ -512,8 +625,36 @@ body {
     padding: 12px;
   }
 
+  .brand {
+    min-width: 0;
+  }
+
+  .top-nav > .ant-space {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .top-nav > .ant-space .ant-space-item,
+  .top-nav > .ant-space button {
+    width: 100%;
+  }
+
+  .top-menu {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
   .top-menu button {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
     height: 40px;
+  }
+
+  .top-menu button.active {
+    background: #eff6ff;
+    border-color: #1677ff;
   }
 
   .page-title,
@@ -526,6 +667,60 @@ body {
     flex: 0 0 50%;
     max-width: 50%;
     margin-bottom: 12px;
+  }
+
+  .sync-card .ant-row,
+  .admin-staff-form .ant-row {
+    display: grid;
+    gap: 10px;
+  }
+
+  .sync-card .ant-col,
+  .admin-staff-form .ant-col {
+    flex: none;
+    max-width: none;
+    width: 100%;
+  }
+
+  .sync-card .ant-form-item,
+  .admin-staff-form .ant-form-item {
+    margin-bottom: 0;
+  }
+
+  .table-card .ant-card-head-title .ant-space {
+    align-items: stretch;
+    display: grid;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .table-card .ant-card-head-title .ant-space-item,
+  .table-card .ant-card-head-title .ant-input-search,
+  .table-card .ant-card-head-title .ant-select,
+  .table-card .ant-card-head-title button {
+    width: 100% !important;
+  }
+
+  .desktop-admin-table {
+    display: none;
+  }
+
+  .admin-mobile-orders,
+  .admin-mobile-staff-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pager {
+    justify-content: center;
+  }
+
+  .pager .ant-pagination {
+    text-align: center;
+  }
+
+  .pager .ant-pagination-options {
+    display: none;
   }
 
   .staff-page {
@@ -553,7 +748,10 @@ body {
   }
 
   .staff-form-grid,
-  .staff-shot-grid {
+  .staff-shot-grid,
+  .admin-card-info,
+  .admin-mobile-grid,
+  .admin-mobile-actions {
     grid-template-columns: 1fr;
   }
 }
