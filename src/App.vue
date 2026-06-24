@@ -9,6 +9,7 @@ import {
   Image,
   Input,
   message as antMessage,
+  Modal,
   Pagination,
   Row,
   Select,
@@ -28,7 +29,7 @@ const { TextArea } = Input;
 
 const ADDRESS_OPTIONS = ["厂家", "潜山"];
 const SHIPPED_OPTIONS = ["未寄出", "已寄出"];
-const PROCESS_OPTIONS = ["未处理", "已回款", "联系中", "加好友中"];
+const PROCESS_OPTIONS = ["未处理", "已回款", "联系中", "加好友中", "加不到拍手"];
 const SYNC_STOP_TEXT = {
   empty_page: "空页停止",
   old_data: "遇到旧数据停止",
@@ -60,6 +61,12 @@ const pager = reactive({ current: 1, pageSize: 10 });
 const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
 const staffExpandedOrders = reactive({});
+const annotateModal = reactive({
+  open: false,
+  loading: false,
+  order: null,
+  note: ""
+});
 
 function readStoredStaff() {
   try {
@@ -234,7 +241,7 @@ const columns = [
   { title: "备注", key: "remark", width: 220 },
   { title: "收款截图", key: "paymentScreenshots", width: 180 },
   { title: "其他截图", key: "otherScreenshots", width: 180 },
-  { title: "操作", key: "action", width: 100, fixed: "right" }
+  { title: "操作", key: "action", width: 180, fixed: "right" }
 ];
 
 const staffColumns = [
@@ -323,6 +330,55 @@ async function syncOrders() {
     antMessage.error(err.message);
   } finally {
     loading.value = false;
+  }
+}
+
+function openAnnotateModal(record) {
+  annotateModal.order = record;
+  annotateModal.note = "";
+  annotateModal.open = true;
+}
+
+async function submitAnnotate() {
+  const note = annotateModal.note.trim();
+  if (!annotateModal.order || !note) {
+    antMessage.warning("请输入标注内容");
+    return;
+  }
+
+  annotateModal.loading = true;
+  try {
+    await request(`/api/admin/orders/${annotateModal.order.id}/upstream-note`, {
+      method: "POST",
+      body: JSON.stringify({ note })
+    });
+    annotateModal.open = false;
+    annotateModal.order = null;
+    annotateModal.note = "";
+    antMessage.success("已标注到上游");
+  } catch (err) {
+    antMessage.error(err.message || "标注失败");
+  } finally {
+    annotateModal.loading = false;
+  }
+}
+
+async function completeUpstream(record) {
+  if (!record) return;
+  const confirmed = window.confirm(`确认把订单 ${record.orderNumber} 标记为已完结吗？`);
+  if (!confirmed) return;
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}/upstream-complete`, {
+      method: "POST",
+      body: "{}"
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order?.id);
+    if (index >= 0) orders.value[index] = data.order;
+    antMessage.success(`已完结并同步远程数据，新增 ${data.sync?.created ?? 0} 条`);
+    await loadOrders();
+  } catch (err) {
+    antMessage.error(err.message || "完结失败");
   }
 }
 
@@ -892,7 +948,11 @@ if (staffLoggedIn.value) loadStaffOrders();
                 </template>
 
                 <template v-else-if="column.key === 'action'">
-                  <Button type="primary" size="small" @click="saveOrder(record)">保存</Button>
+                  <Space direction="vertical" size="small">
+                    <Button type="primary" size="small" @click="saveOrder(record)">保存</Button>
+                    <Button size="small" @click="openAnnotateModal(record)">标注</Button>
+                    <Button danger size="small" @click="completeUpstream(record)">已完结</Button>
+                  </Space>
                 </template>
               </template>
             </Table>
@@ -945,5 +1005,19 @@ if (staffLoggedIn.value) loadStaffOrders();
         </Card>
       </section>
     </main>
+
+    <Modal
+      v-model:open="annotateModal.open"
+      title="标注上游订单"
+      ok-text="提交标注"
+      cancel-text="取消"
+      :confirm-loading="annotateModal.loading"
+      @ok="submitAnnotate"
+    >
+      <Space direction="vertical" style="width: 100%">
+        <div class="muted">订单号：{{ annotateModal.order?.orderNumber || "-" }}</div>
+        <TextArea v-model:value="annotateModal.note" :rows="4" placeholder="请输入要同步到上游的标注信息" />
+      </Space>
+    </Modal>
   </AApp>
 </template>

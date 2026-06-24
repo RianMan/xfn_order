@@ -8,6 +8,8 @@ export const THIRD_PARTY_URL =
 
 export const THIRD_PARTY_COOKIE = process.env.THIRD_PARTY_COOKIE || "";
 
+export const THIRD_PARTY_BASE_URL = process.env.THIRD_PARTY_BASE_URL || "https://enff8jbe9flh3mk9.lhxcx1.com";
+
 export const DEFAULT_IMPORT_PAYLOAD = {
   p: "1",
   fenyei: "10",

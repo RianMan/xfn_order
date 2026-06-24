@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ADMIN_PASSWORD, ADMIN_USER } from "./config.js";
 import { uploadBuffer } from "./cos.js";
-import { fetchThirdPartyOrderPages, fetchThirdPartyOrders } from "./importer.js";
+import { fetchThirdPartyOrderPages } from "./importer.js";
 import { parseAfterSalesOrders } from "./parser.js";
 import {
   claimNextOrder,
@@ -19,6 +19,7 @@ import {
   updateStaffOrder
 } from "./store.js";
 import { createStaff, readStaff, verifyStaff } from "./staffStore.js";
+import { annotateUpstreamOrder, completeUpstreamOrder } from "./upstream.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 7642);
@@ -168,6 +169,68 @@ app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     return;
   }
   res.json({ order });
+});
+
+app.post("/api/admin/orders/:id/upstream-note", requireAdmin, async (req, res) => {
+  try {
+    const orders = await readOrders();
+    const order = orders.find((item) => item.id === req.params.id);
+    const note = String(req.body?.note ?? "").trim();
+
+    if (!order) {
+      res.status(404).json({ message: "订单不存在" });
+      return;
+    }
+    if (!order.sourceId) {
+      res.status(400).json({ message: "缺少上游订单 ID，无法标注" });
+      return;
+    }
+    if (!note) {
+      res.status(400).json({ message: "请输入标注内容" });
+      return;
+    }
+
+    await annotateUpstreamOrder(order.sourceId, note);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(502).json({ message: err.message || "上游标注失败" });
+  }
+});
+
+app.post("/api/admin/orders/:id/upstream-complete", requireAdmin, async (req, res) => {
+  try {
+    const orders = await readOrders();
+    const order = orders.find((item) => item.id === req.params.id);
+
+    if (!order) {
+      res.status(404).json({ message: "订单不存在" });
+      return;
+    }
+    if (!order.sourceId) {
+      res.status(400).json({ message: "缺少上游订单 ID，无法完结" });
+      return;
+    }
+
+    await completeUpstreamOrder(order.sourceId);
+    const updatedOrder = await updateOrder(order.id, {
+      processStatus: "已回款",
+      status: "completed"
+    });
+    const { orders: remoteOrders, pages, stoppedReason } = await fetchThirdPartyOrderPages({});
+    const syncResult = await importOrders(remoteOrders);
+
+    res.json({
+      order: updatedOrder,
+      sync: {
+        ...syncResult,
+        imported: remoteOrders.length,
+        pages,
+        stoppedReason
+      }
+    });
+  } catch (err) {
+    res.status(502).json({ message: err.message || "上游完结失败" });
+  }
 });
 
 app.post("/api/staff/login", async (req, res) => {
