@@ -1,8 +1,11 @@
 import { getDb, parseOrderRow, saveOrderRow } from "./db.js";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 const MIN_RECEIVED_DATE = "2026-06-22 00:00:00";
 const DEFAULT_COMMISSION_AMOUNT = 3;
 const WAGE_PENDING = "工资待结";
+const backupDir = path.resolve("data/backups");
 
 export async function readOrders() {
   const rows = getDb().prepare(`
@@ -71,12 +74,37 @@ function staffVisibleOrder(order) {
   return safeOrder;
 }
 
+function addExistingKeys(map, order) {
+  for (const key of [order.orderNumber, order.sourceId, order.importKey]) {
+    const value = String(key || "").trim();
+    if (value) map.set(value, order.id);
+  }
+}
+
+async function backupOrdersBeforeImport(orders) {
+  if (!orders.length) return "";
+
+  await mkdir(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const file = path.join(backupDir, `orders-before-import-${stamp}.json`);
+  await writeFile(file, JSON.stringify({
+    createdAt: new Date().toISOString(),
+    reason: "before third-party import",
+    count: orders.length,
+    orders
+  }, null, 2));
+  return file;
+}
+
 export async function importOrders(incoming) {
-  const database = getDb();
-  const existsByOrderNumber = database.prepare("SELECT id FROM orders WHERE order_number = ?");
+  const existingOrders = await readOrders();
+  const existingKeys = new Map();
+  for (const order of existingOrders) addExistingKeys(existingKeys, order);
+
   let created = 0;
   let skippedDuplicate = 0;
   let skippedOld = 0;
+  let backupPath = "";
 
   for (const order of incoming) {
     if (!isAfterMinDate(order)) {
@@ -84,10 +112,15 @@ export async function importOrders(incoming) {
       continue;
     }
 
-    if (existsByOrderNumber.get(order.orderNumber)) {
+    const duplicateKey = [order.orderNumber, order.sourceId, order.importKey]
+      .map((item) => String(item || "").trim())
+      .find((item) => item && existingKeys.has(item));
+    if (duplicateKey) {
       skippedDuplicate += 1;
       continue;
     }
+
+    if (!backupPath) backupPath = await backupOrdersBeforeImport(existingOrders);
 
     const createdOrder = normalizeOrder({
       ...order,
@@ -99,11 +132,12 @@ export async function importOrders(incoming) {
     });
 
     saveOrderRow(createdOrder);
+    addExistingKeys(existingKeys, createdOrder);
     created += 1;
   }
 
   const total = getDb().prepare("SELECT COUNT(*) AS count FROM orders").get().count;
-  return { created, skippedDuplicate, skippedOld, total };
+  return { created, skippedDuplicate, skippedOld, total, backupPath };
 }
 
 function filterOrdersByScope(orders, scope = "active") {
