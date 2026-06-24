@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm:server\" \"npm:web\"",
-    "server": "node --watch server/index.js",
+    "server": "node --no-warnings --watch server/index.js",
     "web": "vite --host 0.0.0.0",
-    "dev:server": "node --watch server/index.js",
+    "dev:server": "node --no-warnings --watch server/index.js",
     "dev:web": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "node server/index.js",
-    "sync:orders": "node server/sync.js",
-    "test:parser": "node server/parser.test.js"
+    "start": "node --no-warnings server/index.js",
+    "sync:orders": "node --no-warnings server/sync.js",
+    "test:parser": "node --no-warnings server/parser.test.js"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

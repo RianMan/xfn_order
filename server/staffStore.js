@@ -1,31 +1,24 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { getDb } from "./db.js";
 
-const dataDir = path.resolve("data");
-const staffPath = path.join(dataDir, "staff.json");
-
-async function ensureStaffDb() {
-  await mkdir(dataDir, { recursive: true });
-  try {
-    await readFile(staffPath, "utf8");
-  } catch {
-    await writeFile(staffPath, JSON.stringify({ staff: [] }, null, 2));
-  }
+function rowToStaff(row) {
+  return {
+    id: row.id,
+    account: row.account,
+    name: row.name,
+    password: row.password,
+    createdAt: row.created_at
+  };
 }
 
 export async function readStaff() {
-  await ensureStaffDb();
-  const raw = await readFile(staffPath, "utf8");
-  return JSON.parse(raw).staff ?? [];
-}
-
-async function saveStaff(staff) {
-  await ensureStaffDb();
-  await writeFile(staffPath, JSON.stringify({ staff }, null, 2));
+  return getDb().prepare(`
+    SELECT id, account, name, password, created_at
+    FROM staff
+    ORDER BY created_at DESC
+  `).all().map(rowToStaff);
 }
 
 export async function createStaff({ account, name, password }) {
-  const staff = await readStaff();
   const cleanAccount = String(account || "").trim();
   const cleanName = String(name || "").trim();
   const cleanPassword = String(password || "").trim();
@@ -33,7 +26,10 @@ export async function createStaff({ account, name, password }) {
   if (!cleanAccount || !cleanName || !cleanPassword) {
     throw new Error("账号、姓名、密码不能为空");
   }
-  if (staff.some((item) => item.account === cleanAccount)) {
+
+  const database = getDb();
+  const existed = database.prepare("SELECT id FROM staff WHERE account = ?").get(cleanAccount);
+  if (existed) {
     throw new Error("员工账号已存在");
   }
 
@@ -44,12 +40,21 @@ export async function createStaff({ account, name, password }) {
     password: cleanPassword,
     createdAt: new Date().toISOString()
   };
-  staff.unshift(item);
-  await saveStaff(staff);
+
+  database.prepare(`
+    INSERT INTO staff (id, account, name, password, created_at)
+    VALUES (:id, :account, :name, :password, :createdAt)
+  `).run(item);
+
   return item;
 }
 
 export async function verifyStaff(account, password) {
-  const staff = await readStaff();
-  return staff.find((item) => item.account === String(account || "").trim() && item.password === String(password || ""));
+  const row = getDb().prepare(`
+    SELECT id, account, name, password, created_at
+    FROM staff
+    WHERE account = ? AND password = ?
+  `).get(String(account || "").trim(), String(password || ""));
+
+  return row ? rowToStaff(row) : undefined;
 }

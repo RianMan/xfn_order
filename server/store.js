@@ -1,30 +1,34 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { getDb, parseOrderRow, saveOrderRow } from "./db.js";
 
-const dataDir = path.resolve("data");
-const dbPath = path.join(dataDir, "orders.json");
 const MIN_RECEIVED_DATE = "2026-06-22 00:00:00";
 const DEFAULT_COMMISSION_AMOUNT = 3;
 const WAGE_PENDING = "工资待结";
 
-async function ensureDb() {
-  await mkdir(dataDir, { recursive: true });
-  try {
-    await readFile(dbPath, "utf8");
-  } catch {
-    await writeFile(dbPath, JSON.stringify({ orders: [] }, null, 2));
-  }
-}
-
 export async function readOrders() {
-  await ensureDb();
-  const raw = await readFile(dbPath, "utf8");
-  return (JSON.parse(raw).orders ?? []).map(normalizeOrder);
+  const rows = getDb().prepare(`
+    SELECT data_json FROM orders
+    ORDER BY received_at DESC, created_at DESC
+  `).all();
+  return rows.map(parseOrderRow).map(normalizeOrder);
 }
 
 export async function saveOrders(orders) {
-  await ensureDb();
-  await writeFile(dbPath, JSON.stringify({ orders }, null, 2));
+  const database = getDb();
+  const existing = new Set(database.prepare("SELECT id FROM orders").all().map((row) => row.id));
+  const incoming = new Set(orders.map((order) => order.id).filter(Boolean));
+
+  database.exec("BEGIN");
+  try {
+    for (const order of orders) saveOrderRow(normalizeOrder(order));
+    const remove = database.prepare("DELETE FROM orders WHERE id = ?");
+    for (const id of existing) {
+      if (!incoming.has(id)) remove.run(id);
+    }
+    database.exec("COMMIT");
+  } catch (err) {
+    database.exec("ROLLBACK");
+    throw err;
+  }
 }
 
 function isAfterMinDate(order) {
@@ -68,8 +72,8 @@ function staffVisibleOrder(order) {
 }
 
 export async function importOrders(incoming) {
-  const orders = await readOrders();
-  const byOrderNumber = new Map(orders.map((order) => [order.orderNumber, order]));
+  const database = getDb();
+  const existsByOrderNumber = database.prepare("SELECT id FROM orders WHERE order_number = ?");
   let created = 0;
   let skippedDuplicate = 0;
   let skippedOld = 0;
@@ -80,7 +84,7 @@ export async function importOrders(incoming) {
       continue;
     }
 
-    if (byOrderNumber.has(order.orderNumber)) {
+    if (existsByOrderNumber.get(order.orderNumber)) {
       skippedDuplicate += 1;
       continue;
     }
@@ -94,13 +98,12 @@ export async function importOrders(incoming) {
       updatedAt: new Date().toISOString()
     });
 
-    orders.unshift(createdOrder);
-    byOrderNumber.set(createdOrder.orderNumber, createdOrder);
+    saveOrderRow(createdOrder);
     created += 1;
   }
 
-  await saveOrders(orders);
-  return { created, skippedDuplicate, skippedOld, total: orders.length };
+  const total = getDb().prepare("SELECT COUNT(*) AS count FROM orders").get().count;
+  return { created, skippedDuplicate, skippedOld, total };
 }
 
 function filterOrdersByScope(orders, scope = "active") {
