@@ -137,16 +137,6 @@ const staffColumns = [
   { title: "创建时间", dataIndex: "createdAt", key: "createdAt" }
 ];
 
-function processColor(status) {
-  return {
-    未处理: "default",
-    联系中: "processing",
-    加好友中: "warning",
-    加不到拍手: "error",
-    已回款: "success"
-  }[status] || "default";
-}
-
 async function doLogin() {
   try {
     const data = await request("/api/login", {
@@ -555,91 +545,6 @@ loadOrders();
           </template>
         </Table>
 
-        <div class="admin-mobile-orders">
-          <article v-for="record in pagedOrders" :key="record.id" class="admin-order-card">
-            <div class="admin-card-head">
-              <div>
-                <button type="button" class="admin-copy-order" @click="copy(record.orderNumber)">
-                  {{ record.orderNumber }} 复制
-                </button>
-                <span>{{ record.receivedAt }}</span>
-                <strong>{{ record.shopName }}</strong>
-              </div>
-              <Tag :color="processColor(record.processStatus)">{{ record.processStatus }}</Tag>
-            </div>
-
-            <div class="phone-tags">
-              <Tag v-for="phone in record.phones" :key="phone" color="blue" @click="copy(phone)">
-                {{ phone }} 复制
-              </Tag>
-            </div>
-
-            <div class="admin-card-info">
-              <div><span>售后信息</span><b>{{ record.refundInfo || "售后" }}</b></div>
-              <div><span>上游状态</span><b>{{ record.sourceStatus || "-" }}</b></div>
-            </div>
-
-            <div class="admin-mobile-form">
-              <label>退货原因<TextArea v-model:value="record.returnReason" :rows="2" placeholder="退货原因" /></label>
-              <div class="admin-mobile-grid">
-                <label>是否寄出
-                  <Select v-model:value="record.shipped" allow-clear placeholder="选择">
-                    <Select.Option v-for="item in SHIPPED_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
-                  </Select>
-                </label>
-                <label>退货地址
-                  <Select v-model:value="record.returnAddress" allow-clear placeholder="选择">
-                    <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
-                  </Select>
-                </label>
-              </div>
-              <label>退货单号<Input v-model:value="record.returnTrackingNo" placeholder="退货单号" /></label>
-              <div class="admin-mobile-grid">
-                <label>处理状态
-                  <Select v-model:value="record.processStatus">
-                    <Select.Option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
-                  </Select>
-                </label>
-                <label>处理人<Input v-model:value="record.handler" placeholder="处理人" /></label>
-              </div>
-              <label>备注<TextArea v-model:value="record.internalRemark" :rows="2" placeholder="备注" /></label>
-
-              <div class="admin-shot-section">
-                <span>收款截图</span>
-                <div class="inline-shots">
-                  <div v-for="url in record.paymentScreenshots" :key="url" class="shot-thumb">
-                    <Image :src="url" :width="52" :height="52" />
-                    <button @click="removeScreenshot(record, 'paymentScreenshots', url)">移除</button>
-                  </div>
-                  <Upload :before-upload="file => uploadScreenshot(record, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
-                    <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
-                  </Upload>
-                </div>
-              </div>
-
-              <div class="admin-shot-section">
-                <span>其他截图</span>
-                <div class="inline-shots">
-                  <div v-for="url in record.otherScreenshots" :key="url" class="shot-thumb">
-                    <Image :src="url" :width="52" :height="52" />
-                    <button @click="removeScreenshot(record, 'otherScreenshots', url)">移除</button>
-                  </div>
-                  <Upload :before-upload="file => uploadScreenshot(record, 'otherScreenshots', file)" :show-upload-list="false" accept="image/*">
-                    <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
-                  </Upload>
-                </div>
-              </div>
-            </div>
-
-            <div class="admin-mobile-actions">
-              <Button type="primary" @click="saveOrder(record)">保存</Button>
-              <Button @click="openAnnotateModal(record)">标注</Button>
-              <Button danger @click="completeUpstream(record)">已完结</Button>
-            </div>
-          </article>
-          <div v-if="pagedOrders.length === 0" class="empty-state">暂无订单</div>
-        </div>
-
         <div class="pager">
           <Pagination
             v-model:current="pager.current"
@@ -665,14 +570,6 @@ loadOrders();
 
       <Card class="table-card" title="员工列表">
         <Table class="desktop-admin-table" :columns="staffColumns" :data-source="staffList" row-key="id" :pagination="{ pageSize: 10 }" bordered />
-        <div class="admin-mobile-staff-list">
-          <article v-for="item in staffList" :key="item.id" class="admin-staff-card">
-            <strong>{{ item.name }}</strong>
-            <span>账号：{{ item.account }}</span>
-            <span>创建时间：{{ item.createdAt }}</span>
-          </article>
-          <div v-if="staffList.length === 0" class="empty-state">暂无员工</div>
-        </div>
       </Card>
     </section>
   </main>

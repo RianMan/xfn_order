@@ -289,6 +289,10 @@ app.post("/api/staff/upload", requireStaff, async (req, res) => {
 app.use("/uploads", express.static(path.resolve("data/uploads")));
 app.use(express.static("dist"));
 
+app.get(["/m/admin", "/m/admin/*"], (_req, res) => {
+  res.sendFile(path.resolve("dist/index.html"));
+});
+
 app.listen(port, () => {
   console.log(`After-sales API listening on http://localhost:${port}`);
 });

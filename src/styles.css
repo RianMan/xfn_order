@@ -146,11 +146,6 @@ body {
   min-height: 56px;
 }
 
-.admin-mobile-orders,
-.admin-mobile-staff-list {
-  display: none;
-}
-
 .order-block {
   display: grid;
   gap: 3px;
@@ -508,112 +503,506 @@ body {
   text-align: center;
 }
 
-.admin-order-card,
+.admin-staff-card strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
 .admin-staff-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  display: grid;
+  gap: 5px;
   padding: 12px;
 }
 
-.admin-card-head {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.admin-card-head > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.admin-card-head span,
-.admin-card-info span,
-.admin-mobile-form label,
-.admin-shot-section > span,
 .admin-staff-card span {
   color: #64748b;
   font-size: 12px;
 }
 
-.admin-card-head strong {
+.mobile-admin-login,
+.mobile-admin-page {
+  background: #eef2f7;
   color: #0f172a;
-  font-size: 13px;
+  min-height: 100vh;
+}
+
+.mobile-admin-login {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.mobile-admin-login-card,
+.mobile-admin-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  width: 100%;
+}
+
+.mobile-admin-login-card {
+  max-width: 390px;
+}
+
+.mobile-admin-login-card span,
+.mobile-admin-header span,
+.mobile-admin-panel label,
+.mobile-admin-summary span,
+.mobile-admin-modal section > span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.mobile-admin-login-card h1,
+.mobile-admin-panel h2,
+.mobile-admin-modal h2 {
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.mobile-admin-login-card label,
+.mobile-admin-panel label,
+.mobile-admin-modal section {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-admin-login-card input,
+.mobile-admin-panel input,
+.mobile-admin-tools input,
+.mobile-admin-tools select,
+.mobile-admin-modal textarea {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #0f172a;
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+.mobile-admin-primary {
+  background: #1677ff;
+  border: 1px solid #1677ff;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  min-height: 42px;
+}
+
+.mobile-admin-header {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.mobile-admin-header strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.mobile-admin-header button,
+.mobile-admin-tabs button,
+.mobile-admin-tools button,
+.mobile-admin-pager button,
+.mobile-admin-modal button {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.mobile-admin-tabs {
+  background: #eef2f7;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 10px 12px;
+  position: sticky;
+  top: 61px;
+  z-index: 9;
+}
+
+.mobile-admin-tabs button.active {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.mobile-admin-content {
+  display: grid;
+  gap: 12px;
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 0 12px 24px;
+}
+
+.mobile-admin-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mobile-admin-summary div {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+}
+
+.mobile-admin-summary b {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.mobile-admin-tools {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  padding: 10px;
+}
+
+.mobile-admin-tools input {
+  grid-column: 1 / -1;
+}
+
+.mobile-admin-tools button:last-child {
+  background: #f8fafc;
+}
+
+.m-admin-list,
+.mobile-admin-staff-list {
+  display: grid;
+  gap: 12px;
+}
+
+.m-admin-ticket {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.m-admin-ticket-head {
+  align-items: flex-start;
+  background: #fff;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.m-admin-order-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.m-admin-order-main strong {
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
-.admin-copy-order {
-  background: transparent;
-  border: 0;
-  color: #0f172a;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 700;
-  padding: 0;
-  text-align: left;
+.m-admin-order-main em,
+.m-admin-shop-line,
+.m-admin-section label,
+.m-admin-shot-block > span,
+.m-admin-info-grid span {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
 }
 
-.admin-card-info,
-.admin-mobile-grid {
+.m-admin-status {
+  background: #eef6ff;
+  border-radius: 999px;
+  color: #1677ff;
+  flex: 0 0 auto;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.m-admin-status[data-status="已回款"] {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.m-admin-status[data-status="加不到拍手"] {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.m-admin-shop-line {
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 0 12px 12px;
+}
+
+.m-admin-shop-line span {
+  overflow-wrap: anywhere;
+}
+
+.m-admin-shop-line button,
+.m-admin-phone-row button {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  cursor: pointer;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.m-admin-ticket-body {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.m-admin-phone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.m-admin-info-grid,
+.m-admin-two-col {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.admin-card-info {
+.m-admin-info-grid {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  margin: 8px 0;
+  border-radius: 10px;
   padding: 10px;
 }
 
-.admin-card-info div,
-.admin-mobile-form label,
-.admin-shot-section,
-.admin-staff-card {
+.m-admin-info-grid div,
+.m-admin-section,
+.m-admin-section label,
+.m-admin-shot-block {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
-.admin-card-info b {
+.m-admin-info-grid b {
   color: #0f172a;
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 
-.admin-mobile-form {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-mobile-form .ant-select,
-.admin-mobile-form .ant-input,
-.admin-mobile-form .ant-input-affix-wrapper,
-.admin-mobile-form textarea {
-  width: 100%;
-}
-
-.admin-shot-section {
+.m-admin-section {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px;
 }
 
-.admin-mobile-actions {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12px;
+.m-admin-section > strong {
+  color: #0f172a;
+  font-size: 14px;
 }
 
-.admin-staff-card strong {
+.m-admin-section input,
+.m-admin-section select,
+.m-admin-section textarea {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   color: #0f172a;
-  font-size: 15px;
+  font: inherit;
+  min-height: 40px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.m-admin-section textarea {
+  resize: vertical;
+}
+
+.m-admin-shot-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.m-admin-shot-list a,
+.m-admin-upload {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 70px;
+  overflow: hidden;
+  padding: 4px;
+  place-items: center;
+  text-decoration: none;
+  width: 70px;
+}
+
+.m-admin-shot-list img {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.m-admin-shot-list a button {
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 11px;
+  min-height: 20px;
+}
+
+.m-admin-upload {
+  background: #fff;
+  color: #1677ff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.m-admin-upload input {
+  display: none;
+}
+
+.m-admin-action-bar {
+  bottom: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  position: sticky;
+  z-index: 2;
+}
+
+.m-admin-action-bar button {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  min-height: 40px;
+}
+
+.m-admin-action-bar .primary {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+}
+
+.m-admin-action-bar .danger {
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.mobile-admin-pager {
+  align-items: center;
+  color: #64748b;
+  display: flex;
+  font-size: 13px;
+  gap: 10px;
+  justify-content: center;
+  padding: 4px 0 16px;
+}
+
+.mobile-admin-pager button:disabled,
+.mobile-admin-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.mobile-admin-toast {
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 999px;
+  bottom: 22px;
+  color: #fff;
+  font-size: 13px;
+  left: 50%;
+  max-width: calc(100vw - 32px);
+  padding: 9px 14px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 80;
+}
+
+.mobile-admin-modal {
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.38);
+  bottom: 0;
+  display: flex;
+  left: 0;
+  padding: 12px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 60;
+}
+
+.mobile-admin-modal section {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.2);
+  padding: 16px;
+  width: 100%;
+}
+
+.mobile-admin-modal textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.mobile-admin-modal section > div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
 }
 
 @media (max-width: 960px) {
@@ -701,16 +1090,6 @@ body {
     width: 100% !important;
   }
 
-  .desktop-admin-table {
-    display: none;
-  }
-
-  .admin-mobile-orders,
-  .admin-mobile-staff-list {
-    display: grid;
-    gap: 12px;
-  }
-
   .pager {
     justify-content: center;
   }
@@ -749,9 +1128,25 @@ body {
 
   .staff-form-grid,
   .staff-shot-grid,
-  .admin-card-info,
-  .admin-mobile-grid,
-  .admin-mobile-actions {
+  .m-admin-info-grid,
+  .m-admin-two-col,
+  .m-admin-action-bar {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .mobile-admin-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-admin-tools,
+  .mobile-admin-modal section > div {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-admin-content {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
