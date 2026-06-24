@@ -1,6 +1,5 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
-import { Button, Card, Form, Input, message as antMessage, Upload } from "ant-design-vue";
 import { PROCESS_OPTIONS } from "../constants.js";
 
 const staffLogin = reactive({ account: "", password: "" });
@@ -27,6 +26,17 @@ const staffOrders = ref([]);
 const claimableOrders = ref([]);
 const staffHistoryOrders = ref([]);
 const previewImage = ref("");
+const toast = reactive({ show: false, text: "", type: "success", timer: 0 });
+
+function showToast(text, type = "success") {
+  toast.text = text;
+  toast.type = type;
+  toast.show = true;
+  window.clearTimeout(toast.timer);
+  toast.timer = window.setTimeout(() => {
+    toast.show = false;
+  }, 1800);
+}
 
 function staffHeaders() {
   const token = localStorage.getItem("staffToken");
@@ -111,10 +121,10 @@ async function loginStaff() {
     localStorage.setItem("staffProfile", JSON.stringify(data.staff));
     staff.value = data.staff;
     staffLoggedIn.value = true;
-    antMessage.success("登录成功");
+    showToast("登录成功");
     await loadStaffOrders();
   } catch (err) {
-    antMessage.error(err.message);
+    showToast(err.message, "error");
   }
 }
 
@@ -144,11 +154,11 @@ async function loadStaffOrders() {
 async function claimOrder(order) {
   try {
     await staffRequest(`/api/staff/claim/${order.id}`, { method: "POST", body: "{}" });
-    antMessage.success("领取成功");
+    showToast("领取成功");
     staffTab.value = "mine";
     await loadStaffOrders();
   } catch (err) {
-    antMessage.warning(err.message);
+    showToast(err.message, "warning");
   }
 }
 
@@ -178,12 +188,12 @@ async function saveStaffOrder(record, options = {}) {
   const index = staffOrders.value.findIndex((item) => item.id === data.order.id);
   if (index >= 0) staffOrders.value[index] = data.order;
   if (includeRemark) staffRemarkDrafts[record.id] = "";
-  if (!options.silent) antMessage.success("保存成功");
+  if (!options.silent) showToast("保存成功");
 }
 
 async function uploadStaffScreenshot(record, field, file) {
   if (field !== "paymentScreenshots") {
-    antMessage.error("员工只能上传收款截图");
+    showToast("员工只能上传收款截图", "error");
     return false;
   }
 
@@ -200,11 +210,17 @@ async function uploadStaffScreenshot(record, field, file) {
 
     record[field] = [...(record[field] || []), data.url];
     await saveStaffOrder(record, { includeRemark: false, silent: true });
-    antMessage.success("截图已上传");
+    showToast("截图已上传");
   } catch (err) {
-    antMessage.error(err.message || "截图上传失败");
+    showToast(err.message || "截图上传失败", "error");
   }
   return false;
+}
+
+async function handleStaffFileChange(event, record, field) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (file) await uploadStaffScreenshot(record, field, file);
 }
 
 async function removeStaffScreenshot(record, field, url) {
@@ -227,7 +243,7 @@ function formatDiscussionTime(value) {
 async function submitStaffDiscussion(record) {
   const content = String(staffDiscussionDrafts[record.id] || "").trim();
   if (!content) {
-    antMessage.warning("请输入留言内容");
+    showToast("请输入留言内容", "warning");
     return;
   }
 
@@ -239,9 +255,9 @@ async function submitStaffDiscussion(record) {
     const index = staffOrders.value.findIndex((item) => item.id === data.order.id);
     if (index >= 0) staffOrders.value[index] = data.order;
     staffDiscussionDrafts[record.id] = "";
-    antMessage.success("已发送");
+    showToast("已发送");
   } catch (err) {
-    antMessage.error(err.message || "发送失败");
+    showToast(err.message || "发送失败", "error");
   }
 }
 
@@ -272,16 +288,16 @@ function copy(value) {
 
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(text)
-      .then(() => antMessage.success("已复制"))
+      .then(() => showToast("已复制"))
       .catch(() => {
-        if (fallbackCopy()) antMessage.success("已复制");
-        else antMessage.error("复制失败，请手动复制");
+        if (fallbackCopy()) showToast("已复制");
+        else showToast("复制失败，请手动复制", "error");
       });
     return;
   }
 
-  if (fallbackCopy()) antMessage.success("已复制");
-  else antMessage.error("复制失败，请手动复制");
+  if (fallbackCopy()) showToast("已复制");
+  else showToast("复制失败，请手动复制", "error");
 }
 
 if (staffLoggedIn.value) loadStaffOrders();
@@ -289,21 +305,23 @@ if (staffLoggedIn.value) loadStaffOrders();
 
 <template>
   <main v-if="!staffLoggedIn" class="login-screen staff-login-screen">
-    <Card class="login-card" :bordered="false">
+    <section class="login-card staff-login-card">
       <div class="login-title">
         <span>员工工单系统</span>
         <strong>登录</strong>
       </div>
-      <Form layout="vertical" @submit.prevent>
-        <Form.Item label="员工账号">
-          <Input v-model:value="staffLogin.account" size="large" autocomplete="username" />
-        </Form.Item>
-        <Form.Item label="密码">
-          <Input.Password v-model:value="staffLogin.password" size="large" autocomplete="current-password" />
-        </Form.Item>
-        <Button type="primary" size="large" block @click="loginStaff">进入工单系统</Button>
-      </Form>
-    </Card>
+      <form class="staff-login-form" @submit.prevent="loginStaff">
+        <label>
+          <span>员工账号</span>
+          <input v-model="staffLogin.account" autocomplete="username" placeholder="请输入员工账号" />
+        </label>
+        <label>
+          <span>密码</span>
+          <input v-model="staffLogin.password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+        </label>
+        <button type="submit" class="staff-primary-btn">进入工单系统</button>
+      </form>
+    </section>
   </main>
 
   <main v-else class="staff-page">
@@ -442,9 +460,10 @@ if (staffLoggedIn.value) loadStaffOrders();
                     <img :src="url" alt="收款截图" />
                     <button @click.prevent.stop="removeStaffScreenshot(order, 'paymentScreenshots', url)">移除</button>
                   </a>
-                  <Upload :before-upload="file => uploadStaffScreenshot(order, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
-                    <button class="staff-upload-btn">上传</button>
-                  </Upload>
+                  <label class="staff-upload-btn">
+                    上传
+                    <input type="file" accept="image/*" @change="event => handleStaffFileChange(event, order, 'paymentScreenshots')" />
+                  </label>
                 </div>
               </div>
               <div>
@@ -481,4 +500,6 @@ if (staffLoggedIn.value) loadStaffOrders();
       <span>点击关闭</span>
     </button>
   </main>
+
+  <div v-if="toast.show" class="staff-toast" :class="toast.type">{{ toast.text }}</div>
 </template>
