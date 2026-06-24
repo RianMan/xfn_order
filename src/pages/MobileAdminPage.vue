@@ -404,18 +404,20 @@ loadOrders();
 
       <div class="m-admin-list">
         <article v-for="(record, index) in pagedOrders" :key="record.id" class="m-admin-ticket">
-          <button type="button" class="m-admin-ticket-head" @click="toggleOrder(record, index)">
+          <div class="m-admin-ticket-head">
             <span class="m-admin-order-main">
-              <strong>{{ record.orderNumber }}</strong>
+              <button type="button" class="m-admin-order-copy" @click="copy(record.orderNumber)">
+                {{ record.orderNumber }}
+              </button>
               <em>{{ record.receivedAt }} / {{ record.refundInfo || "售后" }}</em>
             </span>
             <span class="m-admin-status" :data-status="record.processStatus">{{ record.processStatus }}</span>
-          </button>
-
-          <div class="m-admin-shop-line">
-            <span>{{ record.shopName }}</span>
-            <button type="button" @click="copy(record.orderNumber)">复制单号</button>
           </div>
+
+          <button type="button" class="m-admin-shop-line" @click="toggleOrder(record, index)">
+            <span>{{ record.shopName }}</span>
+            <b>{{ isExpanded(record, index) ? "收起" : "展开处理" }}</b>
+          </button>
 
           <div v-if="isExpanded(record, index)" class="m-admin-ticket-body">
             <div class="m-admin-phone-row">

@@ -719,8 +719,6 @@ body {
 .m-admin-ticket-head {
   align-items: flex-start;
   background: #fff;
-  border: 0;
-  cursor: pointer;
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -735,11 +733,17 @@ body {
   min-width: 0;
 }
 
-.m-admin-order-main strong {
+.m-admin-order-copy {
+  background: transparent;
+  border: 0;
   color: #0f172a;
+  cursor: pointer;
   font-size: 16px;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  padding: 0;
+  text-align: left;
 }
 
 .m-admin-order-main em,
@@ -773,18 +777,22 @@ body {
 
 .m-admin-shop-line {
   align-items: center;
+  background: #fff;
+  border: 0;
   border-top: 1px solid #f1f5f9;
+  cursor: pointer;
   display: flex;
   gap: 8px;
   justify-content: space-between;
   padding: 0 12px 12px;
+  text-align: left;
+  width: 100%;
 }
 
 .m-admin-shop-line span {
   overflow-wrap: anywhere;
 }
 
-.m-admin-shop-line button,
 .m-admin-phone-row button {
   background: #eff6ff;
   border: 1px solid #bfdbfe;
@@ -792,6 +800,18 @@ body {
   color: #1d4ed8;
   cursor: pointer;
   min-height: 28px;
+  padding: 0 10px;
+}
+
+.m-admin-shop-line b {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 26px;
   padding: 0 10px;
 }
 
