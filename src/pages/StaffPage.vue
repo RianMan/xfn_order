@@ -111,6 +111,10 @@ const claimableRefundOptions = computed(() => {
   return Array.from(new Set(claimableOrders.value.map((order) => order.refundInfo).filter(Boolean)));
 });
 
+const claimableFilterOptions = computed(() => ["", ...claimableRefundOptions.value]);
+
+const mineFilterOptions = computed(() => ["", ...PROCESS_OPTIONS]);
+
 async function loginStaff() {
   try {
     const data = await staffRequest("/api/staff/login", {
@@ -136,6 +140,33 @@ function logoutStaff() {
   staffOrders.value = [];
   claimableOrders.value = [];
   staffHistoryOrders.value = [];
+}
+
+function switchStaffTab(tab) {
+  staffTab.value = tab;
+  staffPager.current = 1;
+  if (tab === "claimable") {
+    staffFilters.processStatus = "";
+  } else if (tab === "mine") {
+    staffFilters.refundInfo = "";
+  } else {
+    staffFilters.refundInfo = "";
+    staffFilters.processStatus = "";
+  }
+}
+
+async function selectStaffFilter(type, value) {
+  staffPager.current = 1;
+  if (type === "refundInfo") {
+    staffFilters.refundInfo = value;
+    return;
+  }
+  staffFilters.processStatus = value;
+  await loadStaffOrders();
+}
+
+function filterLabel(value, fallback) {
+  return value || fallback;
 }
 
 async function loadStaffOrders() {
@@ -337,60 +368,70 @@ if (staffLoggedIn.value) loadStaffOrders();
       <div class="staff-tabs">
         <button
           :class="{ active: staffTab === 'claimable' }"
-          @click="staffTab = 'claimable'; staffFilters.processStatus = ''; staffPager.current = 1"
+          @click="switchStaffTab('claimable')"
         >
           可领取工单池
         </button>
         <button
           :class="{ active: staffTab === 'mine' }"
-          @click="staffTab = 'mine'; staffFilters.refundInfo = ''; staffPager.current = 1"
+          @click="switchStaffTab('mine')"
         >
           我的工单
         </button>
         <button
           :class="{ active: staffTab === 'history' }"
-          @click="staffTab = 'history'; staffFilters.refundInfo = ''; staffFilters.processStatus = ''; staffPager.current = 1"
+          @click="switchStaffTab('history')"
         >
           处理过的订单
         </button>
       </div>
-      <select
-        v-if="staffTab === 'claimable'"
-        v-model="staffFilters.refundInfo"
-        class="staff-select"
-        @change="staffPager.current = 1"
-      >
-        <option value="">按售后信息筛选</option>
-        <option v-for="item in claimableRefundOptions" :key="item" :value="item">{{ item }}</option>
-      </select>
-      <select
-        v-else-if="staffTab === 'mine'"
-        v-model="staffFilters.processStatus"
-        class="staff-select"
-        @change="staffPager.current = 1; loadStaffOrders()"
-      >
-        <option value="">按处理进度筛选</option>
-        <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
-      </select>
-      <select v-else class="staff-select" disabled>
-        <option>处理过的订单</option>
-      </select>
-      <button class="staff-ghost-btn" @click="loadStaffOrders">刷新</button>
+      <div v-if="staffTab === 'claimable'" class="staff-filter-strip" aria-label="按售后信息筛选">
+        <button
+          v-for="item in claimableFilterOptions"
+          :key="item || 'all-refund'"
+          type="button"
+          :class="{ active: staffFilters.refundInfo === item }"
+          @click="selectStaffFilter('refundInfo', item)"
+        >
+          {{ filterLabel(item, "全部") }}
+        </button>
+      </div>
+      <div v-else-if="staffTab === 'mine'" class="staff-filter-strip" aria-label="按处理进度筛选">
+        <button
+          v-for="item in mineFilterOptions"
+          :key="item || 'all-status'"
+          type="button"
+          :class="{ active: staffFilters.processStatus === item }"
+          @click="selectStaffFilter('processStatus', item)"
+        >
+          {{ filterLabel(item, "全部") }}
+        </button>
+      </div>
+      <div v-else class="staff-filter-strip readonly">
+        <span>已完结工单</span>
+      </div>
+      <button class="staff-refresh-btn" @click="loadStaffOrders">刷新</button>
     </section>
 
     <section class="staff-card-list">
       <article v-for="(order, index) in pagedStaffOrders" :key="order.id" class="staff-order-card">
         <div class="staff-card-top">
-          <button type="button" class="staff-copy-order" @click="copy(order.orderNumber)">{{ order.orderNumber }} 复制</button>
+          <button type="button" class="staff-copy-order" @click="copy(order.orderNumber)">
+            {{ order.orderNumber }}
+          </button>
           <div class="staff-card-actions">
             <span>{{ order.processStatus }}</span>
             <button
               v-if="staffTab === 'mine'"
               type="button"
               class="staff-collapse-btn"
+              :class="{ open: isStaffOrderExpanded(order, index) }"
+              :aria-label="isStaffOrderExpanded(order, index) ? '收拢工单' : '展开工单'"
               @click="toggleStaffOrder(order, index)"
             >
-              {{ isStaffOrderExpanded(order, index) ? "收拢" : "展开" }}
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
             </button>
           </div>
         </div>
@@ -401,7 +442,13 @@ if (staffLoggedIn.value) loadStaffOrders();
 
         <template v-if="isStaffOrderExpanded(order, index)">
           <div class="staff-phone-row">
-            <button v-for="phone in order.phones" :key="phone" type="button" @click="copy(phone)">{{ phone }} 复制</button>
+            <button v-for="phone in order.phones" :key="phone" type="button" :aria-label="`复制手机号 ${phone}`" @click="copy(phone)">
+              <span>{{ phone }}</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h5A1.5 1.5 0 0 1 13 5.5v5A1.5 1.5 0 0 1 11.5 12h-5A1.5 1.5 0 0 1 5 10.5v-5Z" />
+                <path d="M3 9.5v-5A1.5 1.5 0 0 1 4.5 3h5" />
+              </svg>
+            </button>
           </div>
 
           <div v-if="staffTab === 'claimable'" class="claim-preview">

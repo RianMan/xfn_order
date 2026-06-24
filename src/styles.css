@@ -419,7 +419,7 @@ body {
   box-shadow: 0 4px 20px rgba(255, 96, 0, 0.12);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) 82px;
+  grid-template-columns: minmax(0, 1fr) auto;
   margin: -4px auto 14px;
   max-width: 860px;
   padding: 14px;
@@ -440,6 +440,7 @@ body {
 .staff-ghost-btn,
 .staff-primary-btn,
 .staff-upload-btn,
+.staff-refresh-btn,
 .staff-pager button {
   border: 0;
   border-radius: 12px;
@@ -452,6 +453,7 @@ body {
 .staff-tabs button,
 .staff-ghost-btn,
 .staff-upload-btn,
+.staff-refresh-btn,
 .staff-pager button {
   background: #fff;
   color: #8a6a51;
@@ -486,6 +488,63 @@ body {
   color: #ff6000;
   min-width: 76px;
   width: auto;
+}
+
+.staff-refresh-btn {
+  align-self: center;
+  background: #fff7ed;
+  border: 1px solid #ffd7a8;
+  border-radius: 999px;
+  color: #ff6000;
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 34px;
+  min-width: 58px;
+  padding: 0 12px;
+}
+
+.staff-filter-strip {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.staff-filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.staff-filter-strip button,
+.staff-filter-strip span {
+  background: #fffaf5;
+  border: 1px solid #ffe0b2;
+  border-radius: 999px;
+  color: #9a704b;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+.staff-filter-strip button {
+  cursor: pointer;
+}
+
+.staff-filter-strip button.active {
+  background: linear-gradient(135deg, #ff8c00, #ff5000);
+  border-color: transparent;
+  box-shadow: 0 5px 14px rgba(255, 96, 0, 0.18);
+  color: #fff;
+}
+
+.staff-filter-strip.readonly span {
+  background: #fff3e0;
+  color: #ff6000;
 }
 
 .staff-upload-btn {
@@ -550,7 +609,7 @@ body {
 .staff-card-top {
   align-items: flex-start;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: space-between;
 }
 
@@ -571,21 +630,38 @@ body {
 }
 
 .staff-collapse-btn {
-  background: #fff;
-  border: 1px solid #ffe0b2;
-  border-radius: 999px;
+  align-items: center;
+  background: #fff7ed;
+  border: 0;
+  border-radius: 50%;
   color: #ff6000;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  min-height: 28px;
-  padding: 0 10px;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+}
+
+.staff-collapse-btn svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  transition: transform 0.18s ease;
+  width: 16px;
+}
+
+.staff-collapse-btn.open svg {
+  transform: rotate(180deg);
 }
 
 .staff-copy-order {
   background: transparent;
   border: 0;
-  color: #2b2118;
+  color: #ff5a00;
   cursor: pointer;
   font-size: 16px;
   font-weight: 900;
@@ -593,6 +669,10 @@ body {
   overflow-wrap: anywhere;
   padding: 0;
   text-align: left;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 96, 0, 0.28);
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
 }
 
 .staff-card-meta {
@@ -610,15 +690,28 @@ body {
 }
 
 .staff-phone-row button {
+  align-items: center;
   background: #fff3e0;
   border: 1px solid #ffe0b2;
   border-radius: 999px;
   color: #ff6000;
   cursor: pointer;
+  display: inline-flex;
   font-size: 12px;
   font-weight: 800;
+  gap: 6px;
   min-height: 30px;
   padding: 0 10px;
+}
+
+.staff-phone-row svg {
+  fill: none;
+  height: 13px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  width: 13px;
 }
 
 .staff-order-form,
@@ -1466,14 +1559,18 @@ body {
   }
 
   .staff-toolbar {
-    grid-template-columns: minmax(0, 1fr) 78px;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 12px;
     width: calc(100% - 24px);
   }
 
-  .staff-tabs button,
-  .staff-select {
+  .staff-tabs button {
     width: 100% !important;
+  }
+
+  .staff-refresh-btn {
+    min-width: 54px;
+    padding: 0 10px;
   }
 
   .staff-form-grid,
@@ -1498,8 +1595,8 @@ body {
   }
 
   .staff-card-actions {
-    align-items: flex-end;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 }
 
