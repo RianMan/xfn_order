@@ -22,6 +22,7 @@ import { CloudSyncOutlined, LogoutOutlined, UploadOutlined } from "@ant-design/i
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
 const { TextArea } = Input;
+const WAGE_OPTIONS = ["工资待结", "工资已结"];
 
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
 const staffForm = reactive({ account: "", name: "", password: "" });
@@ -42,6 +43,7 @@ const activeTab = ref("orders");
 const filters = reactive({ keyword: "", processStatus: "" });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
+const discussionDrafts = reactive({});
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -92,6 +94,8 @@ async function readUploadResponse(response) {
   return data;
 }
 
+const orderScope = computed(() => (activeTab.value === "history" ? "history" : "active"));
+
 const stats = computed(() => ({
   total: orders.value.length,
   pending: orders.value.filter((item) => item.processStatus === "未处理").length,
@@ -117,7 +121,7 @@ const pagedOrders = computed(() => {
   return filteredOrders.value.slice(start, start + pager.pageSize);
 });
 
-const columns = [
+const baseColumns = [
   { title: "订单信息", key: "order", width: 280, fixed: "left" },
   { title: "售后信息", key: "afterSales", width: 140 },
   { title: "退货原因", key: "returnReason", width: 220 },
@@ -128,8 +132,24 @@ const columns = [
   { title: "备注", key: "remark", width: 220 },
   { title: "收款截图", key: "paymentScreenshots", width: 180 },
   { title: "其他截图", key: "otherScreenshots", width: 180 },
+  { title: "工单对话", key: "discussion", width: 280 },
   { title: "操作", key: "action", width: 180, fixed: "right" }
 ];
+
+const historyColumns = [
+  { title: "佣金", key: "commission", width: 120 },
+  { title: "工资状态", key: "wageStatus", width: 140 }
+];
+
+const columns = computed(() => {
+  if (activeTab.value !== "history") return baseColumns;
+  const actionIndex = baseColumns.findIndex((item) => item.key === "action");
+  return [
+    ...baseColumns.slice(0, actionIndex),
+    ...historyColumns,
+    ...baseColumns.slice(actionIndex)
+  ];
+});
 
 const staffColumns = [
   { title: "账号", dataIndex: "account", key: "account" },
@@ -162,7 +182,7 @@ async function loadOrders() {
   if (!loggedIn.value) return;
   tableLoading.value = true;
   try {
-    const data = await request("/api/admin/orders");
+    const data = await request(`/api/admin/orders?scope=${orderScope.value}`);
     orders.value = data.orders;
   } catch (err) {
     antMessage.error(err.message);
@@ -274,7 +294,9 @@ async function saveOrder(record) {
         handler: record.handler,
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
-        otherScreenshots: record.otherScreenshots || []
+        otherScreenshots: record.otherScreenshots || [],
+        commissionAmount: record.commissionAmount,
+        wageStatus: record.wageStatus
       })
     });
 
@@ -310,6 +332,38 @@ async function uploadScreenshot(record, field, file) {
 async function removeScreenshot(record, field, url) {
   record[field] = (record[field] || []).filter((item) => item !== url);
   await saveOrder(record);
+}
+
+function formatDiscussionTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function submitDiscussion(record) {
+  const content = String(discussionDrafts[record.id] || "").trim();
+  if (!content) {
+    antMessage.warning("请输入回复内容");
+    return;
+  }
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}/discussion`, {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    discussionDrafts[record.id] = "";
+    antMessage.success("已回复");
+  } catch (err) {
+    antMessage.error(err.message || "回复失败");
+  }
 }
 
 function copy(value) {
@@ -378,7 +432,8 @@ loadOrders();
         <span>After-sales</span>
       </div>
       <nav class="top-menu">
-        <button :class="{ active: activeTab === 'orders' }" @click="activeTab = 'orders'">订单台账</button>
+        <button :class="{ active: activeTab === 'orders' }" @click="activeTab = 'orders'; pager.current = 1; loadOrders()">订单台账</button>
+        <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'; pager.current = 1; loadOrders()">历史订单</button>
         <button :class="{ active: activeTab === 'staff' }" @click="activeTab = 'staff'; loadStaffList()">员工管理</button>
       </nav>
       <Space>
@@ -392,12 +447,12 @@ loadOrders();
 
     <section class="page-title">
       <div>
-        <h1>{{ activeTab === "orders" ? "订单补充台账" : "员工管理" }}</h1>
-        <span>{{ activeTab === "orders" ? "三方接口同步，订单重复不覆盖" : "添加员工账号，供移动端领取工单使用" }}</span>
+        <h1>{{ activeTab === "orders" ? "订单补充台账" : activeTab === "history" ? "历史订单" : "员工管理" }}</h1>
+        <span>{{ activeTab === "orders" ? "三方接口同步，订单重复不覆盖" : activeTab === "history" ? "已完结订单，维护佣金和工资发放状态" : "添加员工账号，供移动端领取工单使用" }}</span>
       </div>
     </section>
 
-    <section v-if="activeTab === 'orders'" class="admin-content">
+    <section v-if="activeTab === 'orders' || activeTab === 'history'" class="admin-content">
       <Row :gutter="16" class="stats-row">
         <Col :span="6"><Card><Statistic title="总工单" :value="stats.total" /></Card></Col>
         <Col :span="6"><Card><Statistic title="未处理" :value="stats.pending" /></Card></Col>
@@ -405,7 +460,7 @@ loadOrders();
         <Col :span="6"><Card><Statistic title="已回款" :value="stats.paid" /></Card></Col>
       </Row>
 
-      <Card class="sync-card" title="手动同步">
+      <Card v-if="activeTab === 'orders'" class="sync-card" title="手动同步">
         <Row :gutter="12" align="bottom">
           <Col :span="3"><Form.Item label="页码"><Input v-model:value="importParams.p" /></Form.Item></Col>
           <Col :span="3"><Form.Item label="每页"><Input v-model:value="importParams.fenyei" /></Form.Item></Col>
@@ -453,7 +508,7 @@ loadOrders();
           row-key="id"
           size="middle"
           bordered
-          :scroll="{ x: 1760 }"
+          :scroll="{ x: 2040 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'order'">
@@ -535,11 +590,38 @@ loadOrders();
               </div>
             </template>
 
+            <template v-else-if="column.key === 'commission'">
+              <Input v-model:value="record.commissionAmount" type="number" min="0" step="0.01" placeholder="佣金" />
+            </template>
+
+            <template v-else-if="column.key === 'wageStatus'">
+              <Select v-model:value="record.wageStatus" style="width: 100%">
+                <Select.Option v-for="item in WAGE_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
+              </Select>
+            </template>
+
+            <template v-else-if="column.key === 'discussion'">
+              <div class="discussion-box">
+                <div class="discussion-list">
+                  <div v-for="item in record.discussion" :key="item.id" class="discussion-item" :class="item.authorType">
+                    <div>
+                      <strong>{{ item.authorName }}</strong>
+                      <span>{{ formatDiscussionTime(item.createdAt) }}</span>
+                    </div>
+                    <p>{{ item.content }}</p>
+                  </div>
+                  <span v-if="!(record.discussion || []).length" class="discussion-empty">暂无对话</span>
+                </div>
+                <TextArea v-model:value="discussionDrafts[record.id]" :rows="2" placeholder="回复员工" />
+                <Button size="small" @click="submitDiscussion(record)">回复</Button>
+              </div>
+            </template>
+
             <template v-else-if="column.key === 'action'">
               <Space direction="vertical" size="small">
-                <Button type="primary" size="small" @click="saveOrder(record)">保存</Button>
-                <Button size="small" @click="openAnnotateModal(record)">标注</Button>
-                <Button danger size="small" @click="completeUpstream(record)">已完结</Button>
+                <Button type="primary" size="small" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</Button>
+                <Button v-if="activeTab !== 'history'" size="small" @click="openAnnotateModal(record)">标注</Button>
+                <Button v-if="activeTab !== 'history'" danger size="small" @click="completeUpstream(record)">已完结</Button>
               </Space>
             </template>
           </template>

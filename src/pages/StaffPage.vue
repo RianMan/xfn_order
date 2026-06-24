@@ -9,6 +9,7 @@ const staffTab = ref("claimable");
 const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
 const staffExpandedOrders = reactive({});
+const staffDiscussionDrafts = reactive({});
 
 function readStoredStaff() {
   try {
@@ -24,6 +25,7 @@ const staff = ref(readStoredStaff());
 const staffLoggedIn = ref(Boolean(localStorage.getItem("staffToken") && staff.value));
 const staffOrders = ref([]);
 const claimableOrders = ref([]);
+const staffHistoryOrders = ref([]);
 const previewImage = ref("");
 
 function staffHeaders() {
@@ -48,6 +50,7 @@ async function staffRequest(url, options = {}) {
     staff.value = null;
     staffOrders.value = [];
     claimableOrders.value = [];
+    staffHistoryOrders.value = [];
     throw new Error(data.message || "登录已过期，请重新登录");
   }
   if (!response.ok) throw new Error(data.message || "请求失败");
@@ -69,6 +72,7 @@ async function readUploadResponse(response) {
     staff.value = null;
     staffOrders.value = [];
     claimableOrders.value = [];
+    staffHistoryOrders.value = [];
     throw new Error(data.message || "登录已过期，请重新登录");
   }
   if (!response.ok) throw new Error(data.message || "截图上传失败");
@@ -76,7 +80,11 @@ async function readUploadResponse(response) {
 }
 
 const visibleStaffOrders = computed(() => {
-  const source = staffTab.value === "claimable" ? claimableOrders.value : staffOrders.value;
+  const source = staffTab.value === "claimable"
+    ? claimableOrders.value
+    : staffTab.value === "history"
+      ? staffHistoryOrders.value
+      : staffOrders.value;
   return source.filter((order) => {
     const statusOk = staffTab.value !== "mine" || !staffFilters.processStatus || order.processStatus === staffFilters.processStatus;
     const refundOk = staffTab.value !== "claimable" || !staffFilters.refundInfo || order.refundInfo === staffFilters.refundInfo;
@@ -117,6 +125,7 @@ function logoutStaff() {
   staff.value = null;
   staffOrders.value = [];
   claimableOrders.value = [];
+  staffHistoryOrders.value = [];
 }
 
 async function loadStaffOrders() {
@@ -128,6 +137,8 @@ async function loadStaffOrders() {
   ]);
   staffOrders.value = mine.orders;
   claimableOrders.value = claimable.orders;
+  const history = await staffRequest("/api/staff/orders?scope=history");
+  staffHistoryOrders.value = history.orders;
 }
 
 async function claimOrder(order) {
@@ -200,6 +211,38 @@ async function removeStaffScreenshot(record, field, url) {
   if (field !== "paymentScreenshots") return;
   record[field] = (record[field] || []).filter((item) => item !== url);
   await saveStaffOrder(record, { includeRemark: false, silent: true });
+}
+
+function formatDiscussionTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function submitStaffDiscussion(record) {
+  const content = String(staffDiscussionDrafts[record.id] || "").trim();
+  if (!content) {
+    antMessage.warning("请输入留言内容");
+    return;
+  }
+
+  try {
+    const data = await staffRequest(`/api/staff/orders/${record.id}/discussion`, {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+    const index = staffOrders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) staffOrders.value[index] = data.order;
+    staffDiscussionDrafts[record.id] = "";
+    antMessage.success("已发送");
+  } catch (err) {
+    antMessage.error(err.message || "发送失败");
+  }
 }
 
 function openPreview(url) {
@@ -286,6 +329,12 @@ if (staffLoggedIn.value) loadStaffOrders();
         >
           我的工单
         </button>
+        <button
+          :class="{ active: staffTab === 'history' }"
+          @click="staffTab = 'history'; staffFilters.refundInfo = ''; staffFilters.processStatus = ''; staffPager.current = 1"
+        >
+          处理过的订单
+        </button>
       </div>
       <select
         v-if="staffTab === 'claimable'"
@@ -297,13 +346,16 @@ if (staffLoggedIn.value) loadStaffOrders();
         <option v-for="item in claimableRefundOptions" :key="item" :value="item">{{ item }}</option>
       </select>
       <select
-        v-else
+        v-else-if="staffTab === 'mine'"
         v-model="staffFilters.processStatus"
         class="staff-select"
         @change="staffPager.current = 1; loadStaffOrders()"
       >
         <option value="">按处理进度筛选</option>
         <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
+      </select>
+      <select v-else class="staff-select" disabled>
+        <option>处理过的订单</option>
       </select>
       <button class="staff-ghost-btn" @click="loadStaffOrders">刷新</button>
     </section>
@@ -325,6 +377,9 @@ if (staffLoggedIn.value) loadStaffOrders();
           </div>
         </div>
         <div class="staff-card-meta">{{ order.receivedAt }} / {{ order.refundInfo }}</div>
+        <div v-if="staffTab === 'history'" class="staff-card-meta">
+          佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "工资待结" }}
+        </div>
 
         <template v-if="isStaffOrderExpanded(order, index)">
           <div class="staff-phone-row">
@@ -337,6 +392,13 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div><span>是否寄出</span><b>{{ order.shipped || "未填写" }}</b></div>
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
+          </div>
+
+          <div v-else-if="staffTab === 'history'" class="claim-preview staff-readonly-info">
+            <div><span>售后信息</span><b>{{ order.refundInfo || "-" }}</b></div>
+            <div><span>佣金</span><b>{{ order.commissionAmount ?? 3 }} 元</b></div>
+            <div><span>工资状态</span><b>{{ order.wageStatus || "工资待结" }}</b></div>
+            <div><span>完结时间</span><b>{{ formatDiscussionTime(order.completedAt) || "-" }}</b></div>
           </div>
 
           <div v-else class="staff-order-form">
@@ -357,6 +419,21 @@ if (staffLoggedIn.value) loadStaffOrders();
               <pre class="staff-remark-log">{{ order.internalRemark || "暂无备注" }}</pre>
             </label>
             <label>追加备注<textarea v-model="staffRemarkDrafts[order.id]" rows="2" placeholder="填写后会追加到已有备注后面" /></label>
+            <div class="discussion-box staff-discussion-box">
+              <strong>工单对话</strong>
+              <div class="discussion-list">
+                <div v-for="item in order.discussion" :key="item.id" class="discussion-item" :class="item.authorType">
+                  <div>
+                    <strong>{{ item.authorName }}</strong>
+                    <span>{{ formatDiscussionTime(item.createdAt) }}</span>
+                  </div>
+                  <p>{{ item.content }}</p>
+                </div>
+                <span v-if="!(order.discussion || []).length" class="discussion-empty">暂无对话</span>
+              </div>
+              <textarea v-model="staffDiscussionDrafts[order.id]" rows="2" placeholder="给后台留言" />
+              <button type="button" class="staff-ghost-btn" @click="submitStaffDiscussion(order)">发送留言</button>
+            </div>
             <div class="staff-shot-grid">
               <div>
                 <span>收款截图</span>
@@ -385,7 +462,7 @@ if (staffLoggedIn.value) loadStaffOrders();
         </template>
       </article>
       <div v-if="visibleStaffOrders.length === 0" class="empty-state">
-        {{ staffTab === "claimable" ? "暂无可领取工单" : "暂无我的工单，请先到可领取工单里领取" }}
+        {{ staffTab === "claimable" ? "暂无可领取工单" : staffTab === "history" ? "暂无处理过的订单" : "暂无我的工单，请先到可领取工单里领取" }}
       </div>
       <div v-if="visibleStaffOrders.length > staffPager.pageSize" class="staff-pager">
         <button :disabled="staffPager.current === 1" @click="staffPager.current -= 1">上一页</button>

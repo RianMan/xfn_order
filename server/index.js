@@ -8,10 +8,13 @@ import { uploadBuffer } from "./cos.js";
 import { fetchThirdPartyOrderPages } from "./importer.js";
 import { parseAfterSalesOrders } from "./parser.js";
 import {
+  addAdminDiscussion,
+  addStaffDiscussion,
   claimNextOrder,
   claimOrderById,
   dedupeExistingOrders,
   importOrders,
+  readAdminOrders,
   readClaimableOrders,
   readOrders,
   readStaffOrders,
@@ -123,8 +126,8 @@ app.post("/api/login", (req, res) => {
   res.json({ token, username });
 });
 
-app.get("/api/admin/orders", requireAdmin, async (_req, res) => {
-  res.json({ orders: await readOrders() });
+app.get("/api/admin/orders", requireAdmin, async (req, res) => {
+  res.json({ orders: await readAdminOrders(req.query.scope || "active") });
 });
 
 app.get("/api/admin/staff", requireAdmin, async (_req, res) => {
@@ -171,6 +174,19 @@ app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
   res.json({ order });
 });
 
+app.post("/api/admin/orders/:id/discussion", requireAdmin, async (req, res) => {
+  const result = await addAdminDiscussion(req.params.id, req.body?.content);
+  if (!result) {
+    res.status(404).json({ message: "订单不存在" });
+    return;
+  }
+  if (result.empty) {
+    res.status(400).json({ message: "请输入回复内容" });
+    return;
+  }
+  res.json(result);
+});
+
 app.post("/api/admin/orders/:id/upstream-note", requireAdmin, async (req, res) => {
   try {
     const orders = await readOrders();
@@ -214,7 +230,10 @@ app.post("/api/admin/orders/:id/upstream-complete", requireAdmin, async (req, re
     await completeUpstreamOrder(order.sourceId);
     const updatedOrder = await updateOrder(order.id, {
       processStatus: "已回款",
-      status: "completed"
+      status: "completed",
+      wageStatus: "工资待结",
+      commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : 3,
+      completedAt: new Date().toISOString()
     });
     const { orders: remoteOrders, pages, stoppedReason } = await fetchThirdPartyOrderPages({});
     const syncResult = await importOrders(remoteOrders);
@@ -248,7 +267,7 @@ app.post("/api/staff/login", async (req, res) => {
 });
 
 app.get("/api/staff/orders", requireStaff, async (req, res) => {
-  res.json({ orders: await readStaffOrders(req.staff, req.query.status || "") });
+  res.json({ orders: await readStaffOrders(req.staff, req.query.status || "", req.query.scope || "active") });
 });
 
 app.get("/api/staff/claimable", requireStaff, async (req, res) => {
@@ -280,6 +299,19 @@ app.patch("/api/staff/orders/:id", requireStaff, async (req, res) => {
     return;
   }
   res.json({ order });
+});
+
+app.post("/api/staff/orders/:id/discussion", requireStaff, async (req, res) => {
+  const result = await addStaffDiscussion(req.params.id, req.staff, req.body?.content);
+  if (!result) {
+    res.status(404).json({ message: "工单不存在或不属于当前员工" });
+    return;
+  }
+  if (result.empty) {
+    res.status(400).json({ message: "请输入留言内容" });
+    return;
+  }
+  res.json(result);
 });
 
 app.post("/api/staff/upload", requireStaff, async (req, res) => {

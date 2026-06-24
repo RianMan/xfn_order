@@ -4,6 +4,8 @@ import path from "node:path";
 const dataDir = path.resolve("data");
 const dbPath = path.join(dataDir, "orders.json");
 const MIN_RECEIVED_DATE = "2026-06-22 00:00:00";
+const DEFAULT_COMMISSION_AMOUNT = 3;
+const WAGE_PENDING = "工资待结";
 
 async function ensureDb() {
   await mkdir(dataDir, { recursive: true });
@@ -39,6 +41,10 @@ function normalizeOrder(order) {
     processStatus: "未处理",
     handler: "",
     internalRemark: "",
+    discussion: [],
+    commissionAmount: DEFAULT_COMMISSION_AMOUNT,
+    wageStatus: WAGE_PENDING,
+    completedAt: "",
     paymentScreenshots: [],
     otherScreenshots: order.screenshots ?? [],
     assigneeAccount: "",
@@ -48,6 +54,10 @@ function normalizeOrder(order) {
     ...order,
     paymentScreenshots: order.paymentScreenshots ?? [],
     otherScreenshots: order.otherScreenshots ?? order.screenshots ?? [],
+    discussion: Array.isArray(order.discussion) ? order.discussion : [],
+    commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT,
+    wageStatus: order.wageStatus ?? WAGE_PENDING,
+    completedAt: order.completedAt ?? "",
     status: order.status ?? "pending"
   };
 }
@@ -93,6 +103,15 @@ export async function importOrders(incoming) {
   return { created, skippedDuplicate, skippedOld, total: orders.length };
 }
 
+function filterOrdersByScope(orders, scope = "active") {
+  if (scope === "history") return orders.filter((order) => order.status === "completed");
+  return orders.filter((order) => order.status !== "completed");
+}
+
+export async function readAdminOrders(scope = "active") {
+  return filterOrdersByScope(await readOrders(), scope);
+}
+
 export async function updateOrder(id, patch) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id);
@@ -112,11 +131,17 @@ export async function updateOrder(id, patch) {
     "assigneeName",
     "claimedAt",
     "screenshots",
-    "status"
+    "status",
+    "commissionAmount",
+    "wageStatus",
+    "completedAt"
   ];
 
   for (const field of allowedFields) {
     if (field in patch) order[field] = patch[field];
+  }
+  if ("commissionAmount" in patch) {
+    order.commissionAmount = Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT;
   }
 
   order.updatedAt = new Date().toISOString();
@@ -127,7 +152,7 @@ export async function updateOrder(id, patch) {
 export async function claimNextOrder(staff) {
   const orders = await readOrders();
   const order = orders
-    .filter((item) => !item.assigneeAccount && item.processStatus !== "已回款")
+    .filter((item) => item.status !== "completed" && !item.assigneeAccount && item.processStatus !== "已回款")
     .sort((a, b) => String(a.receivedAt || "").localeCompare(String(b.receivedAt || "")))[0];
 
   if (!order) return null;
@@ -145,7 +170,7 @@ export async function claimNextOrder(staff) {
 export async function readClaimableOrders(status = "") {
   const orders = await readOrders();
   return orders.filter((order) => {
-    const claimable = !order.assigneeAccount && order.processStatus !== "已回款";
+    const claimable = order.status !== "completed" && !order.assigneeAccount && order.processStatus !== "已回款";
     const statusOk = !status || order.processStatus === status;
     return claimable && statusOk;
   }).map(staffVisibleOrder);
@@ -154,7 +179,7 @@ export async function readClaimableOrders(status = "") {
 export async function claimOrderById(id, staff) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id);
-  if (!order || order.assigneeAccount || order.processStatus === "已回款") return null;
+  if (!order || order.status === "completed" || order.assigneeAccount || order.processStatus === "已回款") return null;
 
   order.assigneeAccount = staff.account;
   order.assigneeName = staff.name;
@@ -166,12 +191,13 @@ export async function claimOrderById(id, staff) {
   return staffVisibleOrder(order);
 }
 
-export async function readStaffOrders(staff, status = "") {
+export async function readStaffOrders(staff, status = "", scope = "active") {
   const orders = await readOrders();
   return orders.filter((order) => {
     const ownerOk = order.assigneeAccount === staff.account;
+    const scopeOk = scope === "history" ? order.status === "completed" : order.status !== "completed";
     const statusOk = !status || order.processStatus === status;
-    return ownerOk && statusOk;
+    return ownerOk && scopeOk && statusOk;
   }).map(staffVisibleOrder);
 }
 
@@ -202,6 +228,7 @@ export async function updateStaffOrder(id, staff, patch) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
   if (!order) return null;
+  if (order.status === "completed") return null;
 
   const allowedFields = [
     "processStatus",
@@ -217,6 +244,47 @@ export async function updateStaffOrder(id, staff, patch) {
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
   return staffVisibleOrder(order);
+}
+
+function createDiscussionMessage(authorType, authorName, content) {
+  const text = String(content ?? "").trim();
+  if (!text) return null;
+
+  return {
+    id: crypto.randomUUID(),
+    authorType,
+    authorName,
+    content: text,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export async function addAdminDiscussion(id, content) {
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === id);
+  if (!order) return null;
+
+  const message = createDiscussionMessage("admin", "后台", content);
+  if (!message) return { order, empty: true };
+
+  order.discussion = [...(order.discussion || []), message];
+  order.updatedAt = new Date().toISOString();
+  await saveOrders(orders);
+  return { order, message };
+}
+
+export async function addStaffDiscussion(id, staff, content) {
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
+  if (!order) return null;
+
+  const message = createDiscussionMessage("staff", staff.name, content);
+  if (!message) return { order: staffVisibleOrder(order), empty: true };
+
+  order.discussion = [...(order.discussion || []), message];
+  order.updatedAt = new Date().toISOString();
+  await saveOrders(orders);
+  return { order: staffVisibleOrder(order), message };
 }
 
 export async function dedupeExistingOrders() {

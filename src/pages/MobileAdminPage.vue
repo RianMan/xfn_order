@@ -2,6 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
+const WAGE_OPTIONS = ["工资待结", "工资已结"];
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
 const staffForm = reactive({ account: "", name: "", password: "" });
 const importParams = reactive({
@@ -24,6 +25,7 @@ const filters = reactive({ keyword: "", processStatus: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
 const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
+const discussionDrafts = reactive({});
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -89,6 +91,8 @@ const stats = computed(() => ({
   paid: orders.value.filter((item) => item.processStatus === "已回款").length
 }));
 
+const orderScope = computed(() => (activeTab.value === "history" ? "history" : "active"));
+
 const filteredOrders = computed(() => {
   const keyword = filters.keyword.trim();
   return orders.value.filter((order) => {
@@ -135,7 +139,7 @@ async function loadOrders() {
   if (!loggedIn.value) return;
   tableLoading.value = true;
   try {
-    const data = await request("/api/admin/orders");
+    const data = await request(`/api/admin/orders?scope=${orderScope.value}`);
     orders.value = data.orders || [];
     if (!expansionReady.value) {
       expandedKeys.value = orders.value[0] ? new Set([orderKey(orders.value[0])]) : new Set();
@@ -160,6 +164,8 @@ async function loadStaffList() {
 
 async function switchTab(tab) {
   activeTab.value = tab;
+  pager.current = 1;
+  if (tab === "orders" || tab === "history") await loadOrders();
   if (tab === "staff") await loadStaffList();
 }
 
@@ -211,7 +217,9 @@ async function saveOrder(record) {
         handler: record.handler,
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
-        otherScreenshots: record.otherScreenshots || []
+        otherScreenshots: record.otherScreenshots || [],
+        commissionAmount: record.commissionAmount,
+        wageStatus: record.wageStatus
       })
     });
     const index = orders.value.findIndex((item) => item.id === data.order.id);
@@ -251,6 +259,38 @@ async function handleNativeUpload(event, record, field) {
 async function removeScreenshot(record, field, url) {
   record[field] = (record[field] || []).filter((item) => item !== url);
   await saveOrder(record);
+}
+
+function formatDiscussionTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function submitDiscussion(record) {
+  const content = String(discussionDrafts[record.id] || "").trim();
+  if (!content) {
+    showNotice("请输入回复内容");
+    return;
+  }
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}/discussion`, {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    discussionDrafts[record.id] = "";
+    showNotice("已回复");
+  } catch (err) {
+    showNotice(err.message || "回复失败");
+  }
 }
 
 function openAnnotateModal(record) {
@@ -392,13 +432,14 @@ loadOrders();
       <button type="button" @click="logout">退出</button>
     </header>
 
-    <nav class="mobile-admin-tabs">
+    <nav class="mobile-admin-tabs mobile-admin-tabs-four">
       <button type="button" :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">工单</button>
+      <button type="button" :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史</button>
       <button type="button" :class="{ active: activeTab === 'sync' }" @click="switchTab('sync')">同步</button>
       <button type="button" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">员工</button>
     </nav>
 
-    <section v-if="activeTab === 'orders'" class="mobile-admin-content">
+    <section v-if="activeTab === 'orders' || activeTab === 'history'" class="mobile-admin-content">
       <div class="mobile-admin-summary">
         <div><span>总工单</span><b>{{ stats.total }}</b></div>
         <div><span>未处理</span><b>{{ stats.pending }}</b></div>
@@ -445,6 +486,22 @@ loadOrders();
               <div><span>售后信息</span><b>{{ record.refundInfo || "-" }}</b></div>
               <div><span>申请时间</span><b>{{ record.appliedAt || "-" }}</b></div>
               <div><span>处理时间</span><b>{{ record.handledAt || "-" }}</b></div>
+              <div v-if="activeTab === 'history'"><span>佣金</span><b>{{ record.commissionAmount ?? 3 }} 元</b></div>
+              <div v-if="activeTab === 'history'"><span>工资状态</span><b>{{ record.wageStatus || "工资待结" }}</b></div>
+            </div>
+
+            <div v-if="activeTab === 'history'" class="m-admin-section">
+              <strong>薪资结算</strong>
+              <div class="m-admin-two-col">
+                <label>佣金
+                  <input v-model="record.commissionAmount" type="number" min="0" step="0.01" placeholder="佣金" />
+                </label>
+                <label>工资状态
+                  <select v-model="record.wageStatus">
+                    <option v-for="item in WAGE_OPTIONS" :key="item" :value="item">{{ item }}</option>
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div class="m-admin-section">
@@ -481,6 +538,22 @@ loadOrders();
             </div>
 
             <div class="m-admin-section">
+              <strong>工单对话</strong>
+              <div class="discussion-list">
+                <div v-for="item in record.discussion" :key="item.id" class="discussion-item" :class="item.authorType">
+                  <div>
+                    <strong>{{ item.authorName }}</strong>
+                    <span>{{ formatDiscussionTime(item.createdAt) }}</span>
+                  </div>
+                  <p>{{ item.content }}</p>
+                </div>
+                <span v-if="!(record.discussion || []).length" class="discussion-empty">暂无对话</span>
+              </div>
+              <label>回复员工<textarea v-model="discussionDrafts[record.id]" rows="3" placeholder="输入回复内容" /></label>
+              <button type="button" class="mobile-admin-primary" @click="submitDiscussion(record)">发送回复</button>
+            </div>
+
+            <div class="m-admin-section">
               <strong>截图</strong>
               <div class="m-admin-shot-block">
                 <span>收款截图</span>
@@ -511,9 +584,9 @@ loadOrders();
             </div>
 
             <div class="m-admin-action-bar">
-              <button type="button" class="primary" @click="saveOrder(record)">保存</button>
-              <button type="button" @click="openAnnotateModal(record)">标注</button>
-              <button type="button" class="danger" @click="completeUpstream(record)">已完结</button>
+              <button type="button" class="primary" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</button>
+              <button v-if="activeTab !== 'history'" type="button" @click="openAnnotateModal(record)">标注</button>
+              <button v-if="activeTab !== 'history'" type="button" class="danger" @click="completeUpstream(record)">已完结</button>
             </div>
           </div>
         </article>
