@@ -22,7 +22,8 @@ const tableLoading = ref(false);
 const notice = ref("");
 const filters = reactive({ keyword: "", processStatus: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
-const expandedOrders = reactive({});
+const expandedKeys = ref(new Set());
+const expansionReady = ref(false);
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -136,6 +137,10 @@ async function loadOrders() {
   try {
     const data = await request("/api/admin/orders");
     orders.value = data.orders || [];
+    if (!expansionReady.value) {
+      expandedKeys.value = orders.value[0] ? new Set([orderKey(orders.value[0])]) : new Set();
+      expansionReady.value = true;
+    }
   } catch (err) {
     showNotice(err.message);
   } finally {
@@ -337,13 +342,22 @@ function resetFilters() {
   pager.current = 1;
 }
 
-function isExpanded(order, index) {
-  if (Object.prototype.hasOwnProperty.call(expandedOrders, order.id)) return expandedOrders[order.id];
-  return index === 0;
+function orderKey(order) {
+  return order?.id || order?.orderNumber || "";
 }
 
-function toggleOrder(order, index) {
-  expandedOrders[order.id] = !isExpanded(order, index);
+function isExpanded(order) {
+  return expandedKeys.value.has(orderKey(order));
+}
+
+function toggleOrder(order) {
+  const key = orderKey(order);
+  if (!key) return;
+
+  const next = new Set(expandedKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedKeys.value = next;
 }
 
 function pagePrev() {
@@ -414,12 +428,12 @@ loadOrders();
             <span class="m-admin-status" :data-status="record.processStatus">{{ record.processStatus }}</span>
           </div>
 
-          <button type="button" class="m-admin-shop-line" @click="toggleOrder(record, index)">
+          <button type="button" class="m-admin-shop-line" @click="toggleOrder(record)">
             <span>{{ record.shopName }}</span>
-            <b>{{ isExpanded(record, index) ? "收起" : "展开处理" }}</b>
+            <b>{{ isExpanded(record) ? "收起" : "展开处理" }}</b>
           </button>
 
-          <div v-if="isExpanded(record, index)" class="m-admin-ticket-body">
+          <div v-if="isExpanded(record)" class="m-admin-ticket-body">
             <div class="m-admin-phone-row">
               <button v-for="phone in record.phones" :key="phone" type="button" @click="copy(phone)">
                 {{ phone }} 复制
