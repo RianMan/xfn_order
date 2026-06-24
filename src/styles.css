@@ -318,9 +318,17 @@ body {
 }
 
 .staff-login-screen .login-card {
+  background: #fff;
   border-radius: 20px;
+  box-sizing: border-box;
   box-shadow: 0 8px 32px rgba(255, 107, 44, 0.14);
   overflow: hidden;
+  padding: 28px;
+  width: min(380px, calc(100vw - 32px));
+}
+
+.staff-login-screen .login-card * {
+  box-sizing: border-box;
 }
 
 .staff-login-form {
@@ -519,14 +527,17 @@ body {
 
 .staff-filter-strip button,
 .staff-filter-strip span {
+  align-items: center;
   background: #fffaf5;
   border: 1px solid #ffe0b2;
   border-radius: 999px;
   color: #9a704b;
+  display: inline-flex;
   flex: 0 0 auto;
   font: inherit;
   font-size: 13px;
   font-weight: 900;
+  justify-content: center;
   min-height: 34px;
   padding: 0 14px;
 }
