@@ -42,9 +42,9 @@ function orderBusinessTime(order) {
 
 function sortOrdersByBusinessTime(orders) {
   return [...orders].sort((a, b) => {
-    const byTime = orderBusinessTime(b).localeCompare(orderBusinessTime(a));
+    const byTime = orderBusinessTime(a).localeCompare(orderBusinessTime(b));
     if (byTime) return byTime;
-    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+    return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
   });
 }
 
