@@ -8,11 +8,8 @@ const WAGE_PENDING = "工资待结";
 const backupDir = path.resolve("data/backups");
 
 export async function readOrders() {
-  const rows = getDb().prepare(`
-    SELECT data_json FROM orders
-    ORDER BY received_at DESC, created_at DESC
-  `).all();
-  return rows.map(parseOrderRow).map(normalizeOrder);
+  const rows = getDb().prepare("SELECT data_json FROM orders").all();
+  return sortOrdersByBusinessTime(rows.map(parseOrderRow).map(normalizeOrder));
 }
 
 export async function saveOrders(orders) {
@@ -37,6 +34,18 @@ export async function saveOrders(orders) {
 function isAfterMinDate(order) {
   const date = order.receivedAt || order.appliedAt || "";
   return date >= MIN_RECEIVED_DATE;
+}
+
+function orderBusinessTime(order) {
+  return String(order.receivedAt || order.appliedAt || order.createdAt || "");
+}
+
+function sortOrdersByBusinessTime(orders) {
+  return [...orders].sort((a, b) => {
+    const byTime = orderBusinessTime(b).localeCompare(orderBusinessTime(a));
+    if (byTime) return byTime;
+    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+  });
 }
 
 function normalizeOrder(order) {
@@ -190,7 +199,7 @@ export async function claimNextOrder(staff) {
   const orders = await readOrders();
   const order = orders
     .filter((item) => item.status !== "completed" && !item.assigneeAccount && item.processStatus !== "已回款")
-    .sort((a, b) => String(a.receivedAt || "").localeCompare(String(b.receivedAt || "")))[0];
+    [0];
 
   if (!order) return null;
 

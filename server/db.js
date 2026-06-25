@@ -19,13 +19,14 @@ function readLegacyJson(file, key) {
 }
 
 function orderColumns(order) {
+  const receivedAt = order.receivedAt || order.appliedAt || order.createdAt || "";
   return {
     id: order.id,
     order_number: order.orderNumber,
     status: order.status ?? "pending",
     process_status: order.processStatus ?? "未处理",
     assignee_account: order.assigneeAccount ?? "",
-    received_at: order.receivedAt ?? "",
+    received_at: receivedAt,
     created_at: order.createdAt ?? new Date().toISOString(),
     updated_at: order.updatedAt ?? new Date().toISOString(),
     data_json: JSON.stringify(order)
