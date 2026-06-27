@@ -21,7 +21,7 @@ const staffList = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
 const notice = ref("");
-const filters = reactive({ keyword: "", processStatus: "" });
+const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
 const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
@@ -97,12 +97,17 @@ const filteredOrders = computed(() => {
   const keyword = filters.keyword.trim();
   return orders.value.filter((order) => {
     const statusOk = !filters.processStatus || order.processStatus === filters.processStatus;
+    const assigneeOk =
+      !filters.assigneeAccount ||
+      (filters.assigneeAccount === "__unassigned__"
+        ? !order.assigneeAccount
+        : order.assigneeAccount === filters.assigneeAccount);
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, order.refundInfo, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && keywordOk;
+    return statusOk && assigneeOk && keywordOk;
   });
 });
 
@@ -139,6 +144,7 @@ async function loadOrders() {
   if (!loggedIn.value) return;
   tableLoading.value = true;
   try {
+    if (!staffList.value.length) await loadStaffList();
     const data = await request(`/api/admin/orders?scope=${orderScope.value}`);
     orders.value = data.orders || [];
     if (!expansionReady.value) {
@@ -203,6 +209,15 @@ async function syncOrders() {
   }
 }
 
+function updateAssignee(record, account) {
+  const cleanAccount = account || "";
+  const staff = staffList.value.find((item) => item.account === cleanAccount);
+  record.assigneeAccount = cleanAccount;
+  record.assigneeName = staff?.name || "";
+  record.handler = staff?.name || "";
+  record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
+}
+
 async function saveOrder(record) {
   if (!record) return;
   try {
@@ -215,6 +230,9 @@ async function saveOrder(record) {
         returnAddress: record.returnAddress,
         processStatus: record.processStatus,
         handler: record.handler,
+        assigneeAccount: record.assigneeAccount || "",
+        assigneeName: record.assigneeName || "",
+        claimedAt: record.claimedAt || "",
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
         otherScreenshots: record.otherScreenshots || [],
@@ -379,6 +397,7 @@ function copy(value) {
 function resetFilters() {
   filters.keyword = "";
   filters.processStatus = "";
+  filters.assigneeAccount = "";
   pager.current = 1;
 }
 
@@ -452,6 +471,11 @@ loadOrders();
         <select v-model="filters.processStatus" @change="pager.current = 1">
           <option value="">全部处理进度</option>
           <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
+        </select>
+        <select v-model="filters.assigneeAccount" @change="pager.current = 1">
+          <option value="">全部处理人</option>
+          <option value="__unassigned__">公共池</option>
+          <option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</option>
         </select>
         <button type="button" @click="resetFilters">重置</button>
         <button type="button" @click="loadOrders">{{ tableLoading ? "刷新中" : "刷新" }}</button>
@@ -532,7 +556,12 @@ loadOrders();
                     <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
                   </select>
                 </label>
-                <label>处理人<input v-model="record.handler" placeholder="处理人" /></label>
+                <label>处理人
+                  <select :value="record.assigneeAccount || ''" @change="event => updateAssignee(record, event.target.value)">
+                    <option value="">公共池</option>
+                    <option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</option>
+                  </select>
+                </label>
               </div>
               <label>备注<textarea v-model="record.internalRemark" rows="3" placeholder="填写备注" /></label>
             </div>

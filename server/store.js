@@ -186,6 +186,19 @@ export async function updateOrder(id, patch) {
   for (const field of allowedFields) {
     if (field in patch) order[field] = patch[field];
   }
+  if ("assigneeAccount" in patch) {
+    const account = String(order.assigneeAccount || "").trim();
+    order.assigneeAccount = account;
+    if (!account) {
+      order.assigneeName = "";
+      order.handler = "";
+      order.claimedAt = "";
+    } else {
+      order.assigneeName = String(order.assigneeName || "").trim();
+      order.handler = order.assigneeName || String(order.handler || "").trim();
+      order.claimedAt = order.claimedAt || new Date().toISOString();
+    }
+  }
   if ("commissionAmount" in patch) {
     order.commissionAmount = Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT;
   }

@@ -3,7 +3,7 @@ import { computed, reactive, ref } from "vue";
 import { PROCESS_OPTIONS } from "../constants.js";
 
 const staffLogin = reactive({ account: "", password: "" });
-const staffFilters = reactive({ processStatus: "", refundInfo: "" });
+const staffFilters = reactive({ processStatus: "", refundInfo: "", orderNumber: "" });
 const staffTab = ref("claimable");
 const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
@@ -98,7 +98,9 @@ const visibleStaffOrders = computed(() => {
   return source.filter((order) => {
     const statusOk = staffTab.value !== "mine" || !staffFilters.processStatus || order.processStatus === staffFilters.processStatus;
     const refundOk = staffTab.value !== "claimable" || !staffFilters.refundInfo || order.refundInfo === staffFilters.refundInfo;
-    return statusOk && refundOk;
+    const keyword = staffFilters.orderNumber.trim().toLowerCase();
+    const orderNumberOk = !keyword || String(order.orderNumber || "").toLowerCase().includes(keyword);
+    return statusOk && refundOk && orderNumberOk;
   });
 });
 
@@ -153,6 +155,10 @@ function switchStaffTab(tab) {
     staffFilters.refundInfo = "";
     staffFilters.processStatus = "";
   }
+}
+
+function updateOrderNumberFilter() {
+  staffPager.current = 1;
 }
 
 async function selectStaffFilter(type, value) {
@@ -410,6 +416,16 @@ if (staffLoggedIn.value) loadStaffOrders();
       <div v-else class="staff-filter-strip readonly">
         <span>已完结工单</span>
       </div>
+      <label class="staff-order-search">
+        <span>订单号</span>
+        <input
+          v-model="staffFilters.orderNumber"
+          type="search"
+          inputmode="search"
+          placeholder="输入订单号查询"
+          @input="updateOrderNumberFilter"
+        />
+      </label>
       <button class="staff-refresh-btn" @click="loadStaffOrders">刷新</button>
     </section>
 
@@ -455,12 +471,32 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div><span>售后信息</span><b>{{ order.refundInfo || "-" }}</b></div>
             <div><span>退货原因</span><b>{{ order.returnReason || "未填写" }}</b></div>
             <div><span>是否寄出</span><b>{{ order.shipped || "未填写" }}</b></div>
+            <div v-if="order.returnTrackingNo">
+              <span>退货单号</span>
+              <button type="button" class="staff-copy-field" @click="copy(order.returnTrackingNo)">
+                <b>{{ order.returnTrackingNo }}</b>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h5A1.5 1.5 0 0 1 13 5.5v5A1.5 1.5 0 0 1 11.5 12h-5A1.5 1.5 0 0 1 5 10.5v-5Z" />
+                  <path d="M3 9.5v-5A1.5 1.5 0 0 1 4.5 3h5" />
+                </svg>
+              </button>
+            </div>
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
           </div>
 
           <div v-else-if="staffTab === 'history'" class="claim-preview staff-readonly-info">
             <div><span>售后信息</span><b>{{ order.refundInfo || "-" }}</b></div>
+            <div v-if="order.returnTrackingNo">
+              <span>退货单号</span>
+              <button type="button" class="staff-copy-field" @click="copy(order.returnTrackingNo)">
+                <b>{{ order.returnTrackingNo }}</b>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h5A1.5 1.5 0 0 1 13 5.5v5A1.5 1.5 0 0 1 11.5 12h-5A1.5 1.5 0 0 1 5 10.5v-5Z" />
+                  <path d="M3 9.5v-5A1.5 1.5 0 0 1 4.5 3h5" />
+                </svg>
+              </button>
+            </div>
             <div><span>佣金</span><b>{{ order.commissionAmount ?? 3 }} 元</b></div>
             <div><span>工资状态</span><b>{{ order.wageStatus || "工资待结" }}</b></div>
             <div><span>完结时间</span><b>{{ formatDiscussionTime(order.completedAt) || "-" }}</b></div>
@@ -470,7 +506,16 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div class="claim-preview staff-readonly-info">
               <div><span>退货原因</span><b>{{ order.returnReason || "未填写" }}</b></div>
               <div><span>是否寄出</span><b>{{ order.shipped || "未填写" }}</b></div>
-              <div><span>退货单号</span><b>{{ order.returnTrackingNo || "未填写" }}</b></div>
+              <div v-if="order.returnTrackingNo">
+                <span>退货单号</span>
+                <button type="button" class="staff-copy-field" @click="copy(order.returnTrackingNo)">
+                  <b>{{ order.returnTrackingNo }}</b>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h5A1.5 1.5 0 0 1 13 5.5v5A1.5 1.5 0 0 1 11.5 12h-5A1.5 1.5 0 0 1 5 10.5v-5Z" />
+                    <path d="M3 9.5v-5A1.5 1.5 0 0 1 4.5 3h5" />
+                  </svg>
+                </button>
+              </div>
               <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
             </div>
             <div class="staff-form-grid">

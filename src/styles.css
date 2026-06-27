@@ -427,7 +427,7 @@ body {
   box-shadow: 0 4px 20px rgba(255, 96, 0, 0.12);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px) auto;
   margin: -4px auto 14px;
   max-width: 860px;
   padding: 14px;
@@ -556,6 +556,41 @@ body {
 .staff-filter-strip.readonly span {
   background: #fff3e0;
   color: #ff6000;
+}
+
+.staff-order-search {
+  align-items: center;
+  background: #fffaf5;
+  border: 1px solid #ffe0b2;
+  border-radius: 999px;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.staff-order-search span {
+  color: #9a704b;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.staff-order-search input {
+  background: transparent;
+  border: 0;
+  color: #2b2118;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-width: 150px;
+  outline: none;
+  width: 100%;
+}
+
+.staff-order-search input::placeholder {
+  color: #c59a72;
+  font-weight: 700;
 }
 
 .staff-upload-btn {
@@ -750,6 +785,39 @@ body {
   font-size: 14px;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.staff-copy-field {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #ff6000;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-start;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.staff-copy-field b {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 96, 0, 0.28);
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+
+.staff-copy-field svg {
+  fill: none;
+  flex: 0 0 auto;
+  height: 14px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  width: 14px;
 }
 
 .staff-readonly-info {
@@ -1573,6 +1641,15 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 12px;
     width: calc(100% - 24px);
+  }
+
+  .staff-order-search {
+    grid-column: 1 / -1;
+  }
+
+  .staff-order-search input {
+    min-width: 0;
+    width: 100%;
   }
 
   .staff-tabs button {

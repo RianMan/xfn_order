@@ -40,7 +40,7 @@ const loading = ref(false);
 const tableLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
-const filters = reactive({ keyword: "", processStatus: "" });
+const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "" });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
@@ -107,12 +107,17 @@ const filteredOrders = computed(() => {
   const keyword = filters.keyword.trim();
   return orders.value.filter((order) => {
     const statusOk = !filters.processStatus || order.processStatus === filters.processStatus;
+    const assigneeOk =
+      !filters.assigneeAccount ||
+      (filters.assigneeAccount === "__unassigned__"
+        ? !order.assigneeAccount
+        : order.assigneeAccount === filters.assigneeAccount);
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && keywordOk;
+    return statusOk && assigneeOk && keywordOk;
   });
 });
 
@@ -182,6 +187,7 @@ async function loadOrders() {
   if (!loggedIn.value) return;
   tableLoading.value = true;
   try {
+    if (!staffList.value.length) await loadStaffList();
     const data = await request(`/api/admin/orders?scope=${orderScope.value}`);
     orders.value = data.orders;
   } catch (err) {
@@ -280,6 +286,15 @@ async function completeUpstream(record) {
   }
 }
 
+function updateAssignee(record, account) {
+  const cleanAccount = account || "";
+  const staff = staffList.value.find((item) => item.account === cleanAccount);
+  record.assigneeAccount = cleanAccount;
+  record.assigneeName = staff?.name || "";
+  record.handler = staff?.name || "";
+  record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
+}
+
 async function saveOrder(record) {
   if (!record) return;
   try {
@@ -292,6 +307,9 @@ async function saveOrder(record) {
         returnAddress: record.returnAddress,
         processStatus: record.processStatus,
         handler: record.handler,
+        assigneeAccount: record.assigneeAccount || "",
+        assigneeName: record.assigneeName || "",
+        claimedAt: record.claimedAt || "",
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
         otherScreenshots: record.otherScreenshots || [],
@@ -400,6 +418,7 @@ function copy(value) {
 function resetFilters() {
   filters.keyword = "";
   filters.processStatus = "";
+  filters.assigneeAccount = "";
   pager.current = 1;
 }
 
@@ -495,6 +514,16 @@ loadOrders();
             >
               <Select.Option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
             </Select>
+            <Select
+              v-model:value="filters.assigneeAccount"
+              allow-clear
+              placeholder="全部处理人"
+              style="width: 160px"
+              @change="pager.current = 1"
+            >
+              <Select.Option value="__unassigned__">公共池</Select.Option>
+              <Select.Option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</Select.Option>
+            </Select>
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
@@ -558,7 +587,15 @@ loadOrders();
                 <Select v-model:value="record.processStatus" style="width: 100%">
                   <Select.Option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
                 </Select>
-                <Input v-model:value="record.handler" placeholder="处理人" />
+                <Select
+                  :value="record.assigneeAccount || undefined"
+                  allow-clear
+                  placeholder="公共池"
+                  style="width: 100%"
+                  @change="value => updateAssignee(record, value)"
+                >
+                  <Select.Option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</Select.Option>
+                </Select>
               </Space>
             </template>
 
