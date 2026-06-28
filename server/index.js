@@ -311,7 +311,7 @@ app.patch("/api/staff/orders/:id", requireStaff, async (req, res) => {
   res.json({ order });
 });
 
-app.post("/api/staff/orders/:id/unable", requireStaff, async (req, res) => {
+async function handleStaffUnable(req, res) {
   try {
     const order = await markStaffOrderUnable(req.params.id, req.staff);
     if (!order) {
@@ -323,7 +323,10 @@ app.post("/api/staff/orders/:id/unable", requireStaff, async (req, res) => {
     console.error("[staff unable]", err);
     res.status(500).json({ message: err.message || "退回公共池失败" });
   }
-});
+}
+
+app.post("/api/staff/orders/:id/unable", requireStaff, handleStaffUnable);
+app.patch("/api/staff/orders/:id/unable", requireStaff, handleStaffUnable);
 
 app.post("/api/staff/orders/:id/discussion", requireStaff, async (req, res) => {
   const result = await addStaffDiscussion(req.params.id, req.staff, req.body?.content);

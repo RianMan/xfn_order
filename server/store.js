@@ -292,6 +292,10 @@ export async function updateStaffOrder(id, staff, patch) {
   if (!order) return null;
   if (order.status === "completed") return null;
 
+  if (patch?.unable === true) {
+    return markStaffOrderUnableByOrder(order, orders, staff);
+  }
+
   const allowedFields = [
     "processStatus",
     "paymentScreenshots"
@@ -308,11 +312,7 @@ export async function updateStaffOrder(id, staff, patch) {
   return staffVisibleOrder(order);
 }
 
-export async function markStaffOrderUnable(id, staff) {
-  const orders = await readOrders();
-  const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
-  if (!order || order.status === "completed") return null;
-
+async function markStaffOrderUnableByOrder(order, orders, staff) {
   order.difficultyLevel = (Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0) + 1;
   order.processStatus = "无法处理";
   appendStaffRemark(order, staff, `无法处理，退回公共池（难度 +1，当前难度 ${order.difficultyLevel}）`);
@@ -323,6 +323,14 @@ export async function markStaffOrderUnable(id, staff) {
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
   return staffVisibleOrder(order);
+}
+
+export async function markStaffOrderUnable(id, staff) {
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
+  if (!order || order.status === "completed") return null;
+
+  return markStaffOrderUnableByOrder(order, orders, staff);
 }
 
 function createDiscussionMessage(authorType, authorName, content) {

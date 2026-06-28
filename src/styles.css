@@ -732,11 +732,6 @@ body {
   margin-top: 5px;
 }
 
-.staff-difficulty-meta {
-  color: #dc2626;
-  font-weight: 900;
-}
-
 .staff-phone-row {
   display: flex;
   flex-wrap: wrap;

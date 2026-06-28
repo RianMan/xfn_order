@@ -245,9 +245,9 @@ async function markUnable(order) {
   if (!window.confirm(`确认将订单 ${order.orderNumber} 标记为无法处理并退回公共池吗？`)) return;
 
   try {
-    await staffRequest(`/api/staff/orders/${order.id}/unable`, {
-      method: "POST",
-      body: "{}"
+    await staffRequest(`/api/staff/orders/${order.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ unable: true })
     });
     showToast("已退回公共池");
     await loadStaffOrders();
@@ -509,9 +509,6 @@ if (staffLoggedIn.value) loadStaffOrders();
           </div>
         </div>
         <div class="staff-card-meta">{{ order.receivedAt }} / {{ order.refundInfo }}</div>
-        <div v-if="order.difficultyLevel" class="staff-card-meta staff-difficulty-meta">
-          工单难度：{{ order.difficultyLevel }}
-        </div>
         <div v-if="staffTab === 'history'" class="staff-card-meta">
           佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "工资待结" }}
         </div>
@@ -564,7 +561,6 @@ if (staffLoggedIn.value) loadStaffOrders();
 
           <div v-else class="staff-order-form">
             <div class="claim-preview staff-readonly-info">
-              <div v-if="order.difficultyLevel"><span>工单难度</span><b>{{ order.difficultyLevel }}</b></div>
               <div><span>退货原因</span><b>{{ order.returnReason || "未填写" }}</b></div>
               <div><span>是否寄出</span><b>{{ order.shipped || "未填写" }}</b></div>
               <div v-if="order.returnTrackingNo">
