@@ -26,6 +26,8 @@ const pager = reactive({ current: 1, pageSize: 8 });
 const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
 const discussionDrafts = reactive({});
+const editingStaffId = ref("");
+const staffEditForm = reactive({ account: "", name: "", password: "" });
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -191,6 +193,35 @@ async function createStaffAccount() {
     await loadStaffList();
   } catch (err) {
     showNotice(err.message);
+  }
+}
+
+function startEditStaff(item) {
+  editingStaffId.value = item.id;
+  staffEditForm.account = item.account;
+  staffEditForm.name = item.name;
+  staffEditForm.password = "";
+}
+
+function cancelEditStaff() {
+  editingStaffId.value = "";
+  staffEditForm.account = "";
+  staffEditForm.name = "";
+  staffEditForm.password = "";
+}
+
+async function saveStaffEdit(item) {
+  try {
+    const data = await request(`/api/admin/staff/${item.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(staffEditForm)
+    });
+    const index = staffList.value.findIndex((staff) => staff.id === data.staff.id);
+    if (index >= 0) staffList.value[index] = data.staff;
+    cancelEditStaff();
+    showNotice("员工已更新");
+  } catch (err) {
+    showNotice(err.message || "更新失败");
   }
 }
 
@@ -665,9 +696,21 @@ loadOrders();
 
       <div class="mobile-admin-staff-list">
         <article v-for="item in staffList" :key="item.id" class="admin-staff-card">
-          <strong>{{ item.name }}</strong>
-          <span>账号：{{ item.account }}</span>
-          <span>创建时间：{{ item.createdAt }}</span>
+          <template v-if="editingStaffId === item.id">
+            <label>账号<input v-model="staffEditForm.account" placeholder="登录账号" /></label>
+            <label>姓名<input v-model="staffEditForm.name" placeholder="员工姓名" /></label>
+            <label>新密码<input v-model="staffEditForm.password" type="password" placeholder="留空则不修改" /></label>
+            <div class="m-admin-action-bar">
+              <button type="button" class="primary" @click="saveStaffEdit(item)">保存</button>
+              <button type="button" @click="cancelEditStaff">取消</button>
+            </div>
+          </template>
+          <template v-else>
+            <strong>{{ item.name }}</strong>
+            <span>账号：{{ item.account }}</span>
+            <span>创建时间：{{ item.createdAt }}</span>
+            <button type="button" @click="startEditStaff(item)">编辑</button>
+          </template>
         </article>
         <div v-if="staffList.length === 0" class="empty-state">暂无员工</div>
       </div>

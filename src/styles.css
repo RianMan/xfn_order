@@ -1257,6 +1257,36 @@ body {
   font-size: 12px;
 }
 
+.admin-staff-card label {
+  color: #475569;
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 5px;
+}
+
+.admin-staff-card input {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font: inherit;
+  min-height: 38px;
+  outline: none;
+  padding: 8px 10px;
+}
+
+.admin-staff-card > button {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1677ff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 34px;
+}
+
 .mobile-admin-login,
 .mobile-admin-page {
   background: #eef2f7;

@@ -23,7 +23,7 @@ import {
   updateOrder,
   updateStaffOrder
 } from "./store.js";
-import { createStaff, readStaff, verifyStaff } from "./staffStore.js";
+import { createStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
 import { annotateUpstreamOrder, completeUpstreamOrder } from "./upstream.js";
 
 const app = express();
@@ -140,6 +140,16 @@ app.get("/api/admin/staff", requireAdmin, async (_req, res) => {
 app.post("/api/admin/staff", requireAdmin, async (req, res) => {
   try {
     const item = await createStaff(req.body ?? {});
+    const { password, ...safeItem } = item;
+    res.json({ staff: safeItem });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+app.patch("/api/admin/staff/:id", requireAdmin, async (req, res) => {
+  try {
+    const item = await updateStaff(req.params.id, req.body ?? {});
     const { password, ...safeItem } = item;
     res.json({ staff: safeItem });
   } catch (err) {

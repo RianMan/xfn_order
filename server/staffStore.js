@@ -49,6 +49,37 @@ export async function createStaff({ account, name, password }) {
   return item;
 }
 
+export async function updateStaff(id, patch = {}) {
+  const cleanId = String(id || "").trim();
+  const cleanAccount = String(patch.account || "").trim();
+  const cleanName = String(patch.name || "").trim();
+  const cleanPassword = String(patch.password || "").trim();
+
+  if (!cleanId) throw new Error("员工不存在");
+  if (!cleanAccount || !cleanName) {
+    throw new Error("账号、姓名不能为空");
+  }
+
+  const database = getDb();
+  const current = database.prepare("SELECT id, password FROM staff WHERE id = ?").get(cleanId);
+  if (!current) throw new Error("员工不存在");
+
+  const existed = database.prepare("SELECT id FROM staff WHERE account = ? AND id != ?").get(cleanAccount, cleanId);
+  if (existed) throw new Error("员工账号已存在");
+
+  database.prepare(`
+    UPDATE staff
+    SET account = ?, name = ?, password = ?
+    WHERE id = ?
+  `).run(cleanAccount, cleanName, cleanPassword || current.password, cleanId);
+
+  return rowToStaff(database.prepare(`
+    SELECT id, account, name, password, created_at
+    FROM staff
+    WHERE id = ?
+  `).get(cleanId));
+}
+
 export async function verifyStaff(account, password) {
   const row = getDb().prepare(`
     SELECT id, account, name, password, created_at

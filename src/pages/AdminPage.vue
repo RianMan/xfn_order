@@ -50,6 +50,14 @@ const annotateModal = reactive({
   order: null,
   note: ""
 });
+const staffEditModal = reactive({
+  open: false,
+  loading: false,
+  id: "",
+  account: "",
+  name: "",
+  password: ""
+});
 
 function authHeaders() {
   const token = localStorage.getItem("adminToken");
@@ -162,7 +170,8 @@ const columns = computed(() => {
 const staffColumns = [
   { title: "账号", dataIndex: "account", key: "account" },
   { title: "姓名", dataIndex: "name", key: "name" },
-  { title: "创建时间", dataIndex: "createdAt", key: "createdAt" }
+  { title: "创建时间", dataIndex: "createdAt", key: "createdAt" },
+  { title: "操作", key: "action", width: 120 }
 ];
 
 async function doLogin() {
@@ -219,6 +228,37 @@ async function createStaffAccount() {
     await loadStaffList();
   } catch (err) {
     antMessage.error(err.message);
+  }
+}
+
+function openStaffEditModal(record) {
+  staffEditModal.id = record.id;
+  staffEditModal.account = record.account;
+  staffEditModal.name = record.name;
+  staffEditModal.password = "";
+  staffEditModal.open = true;
+}
+
+async function submitStaffEdit() {
+  if (!staffEditModal.id) return;
+  staffEditModal.loading = true;
+  try {
+    const data = await request(`/api/admin/staff/${staffEditModal.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        account: staffEditModal.account,
+        name: staffEditModal.name,
+        password: staffEditModal.password
+      })
+    });
+    const index = staffList.value.findIndex((item) => item.id === data.staff.id);
+    if (index >= 0) staffList.value[index] = data.staff;
+    staffEditModal.open = false;
+    antMessage.success("员工已更新");
+  } catch (err) {
+    antMessage.error(err.message || "更新失败");
+  } finally {
+    staffEditModal.loading = false;
   }
 }
 
@@ -703,10 +743,31 @@ loadOrders();
       </Card>
 
       <Card class="table-card" title="员工列表">
-        <Table class="desktop-admin-table" :columns="staffColumns" :data-source="staffList" row-key="id" :pagination="{ pageSize: 10 }" bordered />
+        <Table class="desktop-admin-table" :columns="staffColumns" :data-source="staffList" row-key="id" :pagination="{ pageSize: 10 }" bordered>
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'action'">
+              <Button size="small" @click="openStaffEditModal(record)">编辑</Button>
+            </template>
+          </template>
+        </Table>
       </Card>
     </section>
   </main>
+
+  <Modal
+    v-model:open="staffEditModal.open"
+    title="编辑员工"
+    :confirm-loading="staffEditModal.loading"
+    ok-text="保存"
+    cancel-text="取消"
+    @ok="submitStaffEdit"
+  >
+    <Space direction="vertical" style="width: 100%">
+      <Input v-model:value="staffEditModal.account" placeholder="登录账号" />
+      <Input v-model:value="staffEditModal.name" placeholder="员工姓名" />
+      <Input.Password v-model:value="staffEditModal.password" placeholder="新密码，留空则不修改" />
+    </Space>
+  </Modal>
 
   <Modal
     v-model:open="annotateModal.open"
