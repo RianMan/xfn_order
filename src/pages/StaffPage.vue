@@ -59,7 +59,13 @@ async function staffRequest(url, options = {}) {
       ...(options.headers ?? {})
     }
   });
-  const data = await response.json().catch(() => ({}));
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
   if (response.status === 401) {
     localStorage.removeItem("staffToken");
     localStorage.removeItem("staffProfile");
@@ -70,7 +76,7 @@ async function staffRequest(url, options = {}) {
     staffHistoryOrders.value = [];
     throw new Error(data.message || "登录已过期，请重新登录");
   }
-  if (!response.ok) throw new Error(data.message || "请求失败");
+  if (!response.ok) throw new Error(data.message || `请求失败：${response.status}`);
   return data;
 }
 

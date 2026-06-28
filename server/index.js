@@ -312,12 +312,17 @@ app.patch("/api/staff/orders/:id", requireStaff, async (req, res) => {
 });
 
 app.post("/api/staff/orders/:id/unable", requireStaff, async (req, res) => {
-  const order = await markStaffOrderUnable(req.params.id, req.staff);
-  if (!order) {
-    res.status(404).json({ message: "工单不存在或不属于当前员工" });
-    return;
+  try {
+    const order = await markStaffOrderUnable(req.params.id, req.staff);
+    if (!order) {
+      res.status(404).json({ message: "工单不存在或不属于当前员工，可能已经退回公共池" });
+      return;
+    }
+    res.json({ order });
+  } catch (err) {
+    console.error("[staff unable]", err);
+    res.status(500).json({ message: err.message || "退回公共池失败" });
   }
-  res.json({ order });
 });
 
 app.post("/api/staff/orders/:id/discussion", requireStaff, async (req, res) => {
