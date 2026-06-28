@@ -257,16 +257,16 @@ async function markUnable(order) {
   }
 }
 
-function isStaffOrderExpanded(order, index) {
+function isStaffOrderExpanded(order) {
   if (staffTab.value !== "mine") return true;
   if (Object.prototype.hasOwnProperty.call(staffExpandedOrders, order.id)) {
     return staffExpandedOrders[order.id];
   }
-  return index === 0;
+  return false;
 }
 
-function toggleStaffOrder(order, index) {
-  staffExpandedOrders[order.id] = !isStaffOrderExpanded(order, index);
+function toggleStaffOrder(order) {
+  staffExpandedOrders[order.id] = !isStaffOrderExpanded(order);
 }
 
 async function saveStaffOrder(record, options = {}) {
@@ -499,9 +499,9 @@ if (staffLoggedIn.value) loadStaffOrders();
               v-if="staffTab === 'mine'"
               type="button"
               class="staff-collapse-btn"
-              :class="{ open: isStaffOrderExpanded(order, index) }"
-              :aria-label="isStaffOrderExpanded(order, index) ? '收拢工单' : '展开工单'"
-              @click="toggleStaffOrder(order, index)"
+              :class="{ open: isStaffOrderExpanded(order) }"
+              :aria-label="isStaffOrderExpanded(order) ? '收拢工单' : '展开工单'"
+              @click="toggleStaffOrder(order)"
             >
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M4 6l4 4 4-4" />
@@ -514,7 +514,7 @@ if (staffLoggedIn.value) loadStaffOrders();
           佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "工资待结" }}
         </div>
 
-        <template v-if="isStaffOrderExpanded(order, index)">
+        <template v-if="isStaffOrderExpanded(order)">
           <div class="staff-phone-row">
             <button v-for="phone in order.phones" :key="phone" type="button" :aria-label="`复制手机号 ${phone}`" @click="copy(phone)">
               <span>{{ phone }}</span>
