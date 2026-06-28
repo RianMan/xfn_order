@@ -211,10 +211,15 @@ export async function updateOrder(id, patch) {
   return order;
 }
 
+function isClaimableOrder(order) {
+  if (order.status === "completed" || order.processStatus === "已回款") return false;
+  return !order.assigneeAccount || order.processStatus === "无法处理";
+}
+
 export async function claimNextOrder(staff) {
   const orders = await readOrders();
   const order = orders
-    .filter((item) => item.status !== "completed" && !item.assigneeAccount && item.processStatus !== "已回款")
+    .filter(isClaimableOrder)
     [0];
 
   if (!order) return null;
@@ -223,7 +228,7 @@ export async function claimNextOrder(staff) {
   order.assigneeName = staff.name;
   order.handler = staff.name;
   order.claimedAt = new Date().toISOString();
-  order.processStatus = order.processStatus || "未处理";
+  order.processStatus = order.processStatus === "无法处理" ? "未处理" : (order.processStatus || "未处理");
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
   return staffVisibleOrder(order);
@@ -232,7 +237,7 @@ export async function claimNextOrder(staff) {
 export async function readClaimableOrders(status = "") {
   const orders = await readOrders();
   return orders.filter((order) => {
-    const claimable = order.status !== "completed" && !order.assigneeAccount && order.processStatus !== "已回款";
+    const claimable = isClaimableOrder(order);
     const statusOk = !status || order.processStatus === status;
     return claimable && statusOk;
   }).map(staffVisibleOrder);
@@ -241,13 +246,13 @@ export async function readClaimableOrders(status = "") {
 export async function claimOrderById(id, staff) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id);
-  if (!order || order.status === "completed" || order.assigneeAccount || order.processStatus === "已回款") return null;
+  if (!order || !isClaimableOrder(order)) return null;
 
   order.assigneeAccount = staff.account;
   order.assigneeName = staff.name;
   order.handler = staff.name;
   order.claimedAt = new Date().toISOString();
-  order.processStatus = order.processStatus || "未处理";
+  order.processStatus = order.processStatus === "无法处理" ? "未处理" : (order.processStatus || "未处理");
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
   return staffVisibleOrder(order);
@@ -259,7 +264,8 @@ export async function readStaffOrders(staff, status = "", scope = "active") {
     const ownerOk = order.assigneeAccount === staff.account;
     const scopeOk = scope === "history" ? order.status === "completed" : order.status !== "completed";
     const statusOk = !status || order.processStatus === status;
-    return ownerOk && scopeOk && statusOk;
+    const visibleStatusOk = scope === "history" || order.processStatus !== "无法处理";
+    return ownerOk && scopeOk && statusOk && visibleStatusOk;
   }).map(staffVisibleOrder);
 }
 

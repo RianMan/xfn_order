@@ -247,8 +247,9 @@ async function markUnable(order) {
   try {
     await staffRequest(`/api/staff/orders/${order.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ unable: true })
+      body: JSON.stringify({ unable: true, processStatus: "无法处理" })
     });
+    staffOrders.value = staffOrders.value.filter((item) => item.id !== order.id);
     showToast("已退回公共池");
     await loadStaffOrders();
   } catch (err) {
