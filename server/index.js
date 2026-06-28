@@ -6,6 +6,7 @@ import path from "node:path";
 import { ADMIN_PASSWORD, ADMIN_USER } from "./config.js";
 import { uploadBuffer } from "./cos.js";
 import { fetchThirdPartyOrderPages } from "./importer.js";
+import { queryUpstreamOrder } from "./orderQuery.js";
 import { parseAfterSalesOrders } from "./parser.js";
 import {
   addAdminDiscussion,
@@ -272,6 +273,14 @@ app.get("/api/staff/orders", requireStaff, async (req, res) => {
 
 app.get("/api/staff/claimable", requireStaff, async (req, res) => {
   res.json({ orders: await readClaimableOrders(req.query.status || "") });
+});
+
+app.get("/api/staff/order-query", requireStaff, async (req, res) => {
+  try {
+    res.json(await queryUpstreamOrder(req.query.order_no || req.query.keyword || ""));
+  } catch (err) {
+    res.json({ success: false, msg: err.message || "查询失败" });
+  }
 });
 
 app.post("/api/staff/claim", requireStaff, async (req, res) => {

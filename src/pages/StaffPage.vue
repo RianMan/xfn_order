@@ -9,6 +9,13 @@ const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
 const staffExpandedOrders = reactive({});
 const staffDiscussionDrafts = reactive({});
+const orderQuerySheet = reactive({
+  open: false,
+  loading: false,
+  orderNo: "",
+  results: [],
+  message: ""
+});
 
 function readStoredStaff() {
   try {
@@ -173,6 +180,34 @@ async function selectStaffFilter(type, value) {
 
 function filterLabel(value, fallback) {
   return value || fallback;
+}
+
+async function queryOrderDetail(order) {
+  const orderNo = String(order?.orderNumber || "").trim();
+  if (!orderNo || orderQuerySheet.loading) return;
+
+  orderQuerySheet.open = true;
+  orderQuerySheet.loading = true;
+  orderQuerySheet.orderNo = orderNo;
+  orderQuerySheet.results = [];
+  orderQuerySheet.message = "";
+
+  try {
+    const params = new URLSearchParams({ order_no: orderNo });
+    const data = await staffRequest(`/api/staff/order-query?${params.toString()}`);
+    orderQuerySheet.results = data.results || [];
+    orderQuerySheet.message = data.success
+      ? (data.msg || (orderQuerySheet.results.length ? "" : "未找到该订单"))
+      : (data.msg || "查询失败");
+  } catch (err) {
+    orderQuerySheet.message = err.message || "查询失败";
+  } finally {
+    orderQuerySheet.loading = false;
+  }
+}
+
+function closeOrderQuerySheet() {
+  orderQuerySheet.open = false;
 }
 
 async function loadStaffOrders() {
@@ -432,8 +467,8 @@ if (staffLoggedIn.value) loadStaffOrders();
     <section class="staff-card-list">
       <article v-for="(order, index) in pagedStaffOrders" :key="order.id" class="staff-order-card">
         <div class="staff-card-top">
-          <button type="button" class="staff-copy-order" @click="copy(order.orderNumber)">
-            {{ order.orderNumber }}
+          <button type="button" class="staff-copy-order" :disabled="orderQuerySheet.loading" @click="queryOrderDetail(order)">
+            {{ orderQuerySheet.loading && orderQuerySheet.orderNo === order.orderNumber ? "查询中..." : order.orderNumber }}
           </button>
           <div class="staff-card-actions">
             <span>{{ order.processStatus }}</span>
@@ -592,6 +627,59 @@ if (staffLoggedIn.value) loadStaffOrders();
       <span>点击关闭</span>
     </button>
   </main>
+
+  <div v-if="orderQuerySheet.open" class="staff-sheet-backdrop" @click="closeOrderQuerySheet">
+    <section class="staff-order-sheet" @click.stop>
+      <header>
+        <div>
+          <strong>订单详情</strong>
+          <span>{{ orderQuerySheet.orderNo }}</span>
+        </div>
+        <button type="button" @click="closeOrderQuerySheet">关闭</button>
+      </header>
+
+      <div v-if="orderQuerySheet.loading" class="staff-sheet-state">正在查询订单...</div>
+      <div v-else-if="!orderQuerySheet.results.length" class="staff-sheet-state">
+        {{ orderQuerySheet.message || "未找到该订单" }}
+      </div>
+      <div v-else class="staff-sheet-results">
+        <article v-for="item in orderQuerySheet.results" :key="item.sourceId" class="staff-query-card">
+          <div class="staff-query-head">
+            <b>#{{ item.sortNo }}</b>
+            <span>{{ item.status || "未知状态" }}</span>
+            <em>{{ item.shopMasked || item.shop || "-" }}</em>
+          </div>
+          <div class="staff-query-grid">
+            <div v-if="item.productName"><span>商品</span><b>{{ item.productName }}</b></div>
+            <div v-if="item.productDesc"><span>规格</span><b>{{ item.productDesc }}</b></div>
+            <div v-if="item.phone">
+              <span>手机号</span>
+              <button type="button" @click="copy(item.phone)">{{ item.phone }} 复制</button>
+            </div>
+            <div v-if="item.systemId"><span>系统编号</span><b>{{ item.systemId }}</b></div>
+            <div v-if="item.orderNo"><span>订单号</span><b>{{ item.orderNo }}</b></div>
+            <div><span>金额</span><b class="staff-query-price">¥{{ item.price }}</b></div>
+            <div v-if="item.uploadTime"><span>上传时间</span><b>{{ item.uploadTime }}</b></div>
+            <div v-if="item.remark"><span>备注</span><b>{{ item.remark }}</b></div>
+            <div v-if="item.expressNos?.length" class="staff-query-wide">
+              <span>快递单号</span>
+              <div class="staff-query-express">
+                <em v-if="item.expressCo">{{ item.expressCo }}</em>
+                <button v-for="no in item.expressNos" :key="no" type="button" @click="copy(no)">{{ no }} 复制</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="item.screenshotUrls?.length" class="staff-query-images">
+            <button v-for="(url, imgIndex) in item.screenshotUrls" :key="url" type="button" @click="openPreview(url)">
+              <img :src="url" :alt="imgIndex === 0 ? '下单截图' : '发货截图'" />
+              <span>{{ imgIndex === 0 ? "下单截图" : "发货截图" }}</span>
+            </button>
+          </div>
+          <div v-else class="staff-query-no-img">暂无截图</div>
+        </article>
+      </div>
+    </section>
+  </div>
 
   <div v-if="toast.show" class="staff-toast" :class="toast.type">{{ toast.text }}</div>
 </template>
