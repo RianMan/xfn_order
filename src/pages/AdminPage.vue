@@ -40,7 +40,7 @@ const loading = ref(false);
 const tableLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
-const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "" });
+const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "" });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
@@ -112,12 +112,15 @@ const filteredOrders = computed(() => {
       (filters.assigneeAccount === "__unassigned__"
         ? !order.assigneeAccount
         : order.assigneeAccount === filters.assigneeAccount);
+    const difficultyOk =
+      !filters.difficulty ||
+      (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && keywordOk;
   });
 });
 
@@ -419,6 +422,7 @@ function resetFilters() {
   filters.keyword = "";
   filters.processStatus = "";
   filters.assigneeAccount = "";
+  filters.difficulty = "";
   pager.current = 1;
 }
 
@@ -524,6 +528,16 @@ loadOrders();
               <Select.Option value="__unassigned__">公共池</Select.Option>
               <Select.Option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</Select.Option>
             </Select>
+            <Select
+              v-model:value="filters.difficulty"
+              allow-clear
+              placeholder="全部难度"
+              style="width: 130px"
+              @change="pager.current = 1"
+            >
+              <Select.Option value="hard">难单</Select.Option>
+              <Select.Option value="normal">普通单</Select.Option>
+            </Select>
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
@@ -547,6 +561,7 @@ loadOrders();
                 </Button>
                 <span>{{ record.receivedAt }}</span>
                 <span>{{ record.shopName }}</span>
+                <Tag v-if="record.difficultyLevel" color="red">难度 {{ record.difficultyLevel }}</Tag>
                 <div class="phone-tags">
                   <Tag v-for="phone in record.phones" :key="phone" color="blue" @click="copy(phone)">
                     {{ phone }} 复制

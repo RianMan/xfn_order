@@ -21,7 +21,7 @@ const staffList = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
 const notice = ref("");
-const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "" });
+const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
 const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
@@ -102,12 +102,15 @@ const filteredOrders = computed(() => {
       (filters.assigneeAccount === "__unassigned__"
         ? !order.assigneeAccount
         : order.assigneeAccount === filters.assigneeAccount);
+    const difficultyOk =
+      !filters.difficulty ||
+      (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, order.refundInfo, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && keywordOk;
   });
 });
 
@@ -398,6 +401,7 @@ function resetFilters() {
   filters.keyword = "";
   filters.processStatus = "";
   filters.assigneeAccount = "";
+  filters.difficulty = "";
   pager.current = 1;
 }
 
@@ -477,6 +481,11 @@ loadOrders();
           <option value="__unassigned__">公共池</option>
           <option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</option>
         </select>
+        <select v-model="filters.difficulty" @change="pager.current = 1">
+          <option value="">全部难度</option>
+          <option value="hard">难单</option>
+          <option value="normal">普通单</option>
+        </select>
         <button type="button" @click="resetFilters">重置</button>
         <button type="button" @click="loadOrders">{{ tableLoading ? "刷新中" : "刷新" }}</button>
       </div>
@@ -489,6 +498,7 @@ loadOrders();
                 {{ record.orderNumber }}
               </button>
               <em>{{ record.receivedAt }} / {{ record.refundInfo || "售后" }}</em>
+              <em v-if="record.difficultyLevel">难度 {{ record.difficultyLevel }}</em>
             </span>
             <span class="m-admin-status" :data-status="record.processStatus">{{ record.processStatus }}</span>
           </div>

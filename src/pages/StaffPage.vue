@@ -234,6 +234,22 @@ async function claimOrder(order) {
   }
 }
 
+async function markUnable(order) {
+  if (!order) return;
+  if (!window.confirm(`确认将订单 ${order.orderNumber} 标记为无法处理并退回公共池吗？`)) return;
+
+  try {
+    await staffRequest(`/api/staff/orders/${order.id}/unable`, {
+      method: "POST",
+      body: "{}"
+    });
+    showToast("已退回公共池");
+    await loadStaffOrders();
+  } catch (err) {
+    showToast(err.message || "退回失败", "error");
+  }
+}
+
 function isStaffOrderExpanded(order, index) {
   if (staffTab.value !== "mine") return true;
   if (Object.prototype.hasOwnProperty.call(staffExpandedOrders, order.id)) {
@@ -487,6 +503,9 @@ if (staffLoggedIn.value) loadStaffOrders();
           </div>
         </div>
         <div class="staff-card-meta">{{ order.receivedAt }} / {{ order.refundInfo }}</div>
+        <div v-if="order.difficultyLevel" class="staff-card-meta staff-difficulty-meta">
+          工单难度：{{ order.difficultyLevel }}
+        </div>
         <div v-if="staffTab === 'history'" class="staff-card-meta">
           佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "工资待结" }}
         </div>
@@ -539,6 +558,7 @@ if (staffLoggedIn.value) loadStaffOrders();
 
           <div v-else class="staff-order-form">
             <div class="claim-preview staff-readonly-info">
+              <div v-if="order.difficultyLevel"><span>工单难度</span><b>{{ order.difficultyLevel }}</b></div>
               <div><span>退货原因</span><b>{{ order.returnReason || "未填写" }}</b></div>
               <div><span>是否寄出</span><b>{{ order.shipped || "未填写" }}</b></div>
               <div v-if="order.returnTrackingNo">
@@ -604,7 +624,10 @@ if (staffLoggedIn.value) loadStaffOrders();
               </div>
             </div>
           </div>
-          <button v-if="staffTab === 'mine'" class="staff-primary-btn" @click="saveStaffOrder(order)">保存工单</button>
+          <div v-if="staffTab === 'mine'" class="staff-action-row">
+            <button type="button" class="staff-danger-btn" @click="markUnable(order)">无法处理</button>
+            <button type="button" class="staff-primary-btn" @click="saveStaffOrder(order)">保存工单</button>
+          </div>
         </template>
       </article>
       <div v-if="visibleStaffOrders.length === 0" class="empty-state">

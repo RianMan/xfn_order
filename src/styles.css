@@ -732,6 +732,11 @@ body {
   margin-top: 5px;
 }
 
+.staff-difficulty-meta {
+  color: #dc2626;
+  font-weight: 900;
+}
+
 .staff-phone-row {
   display: flex;
   flex-wrap: wrap;
@@ -873,6 +878,25 @@ body {
 
 .staff-primary-btn {
   width: 100%;
+}
+
+.staff-action-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+}
+
+.staff-danger-btn {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  color: #e11d48;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  min-height: 42px;
+  padding: 0 12px;
 }
 
 .staff-pager {

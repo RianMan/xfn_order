@@ -15,6 +15,7 @@ import {
   claimOrderById,
   dedupeExistingOrders,
   importOrders,
+  markStaffOrderUnable,
   readAdminOrders,
   readClaimableOrders,
   readOrders,
@@ -303,6 +304,15 @@ app.post("/api/staff/claim/:id", requireStaff, async (req, res) => {
 
 app.patch("/api/staff/orders/:id", requireStaff, async (req, res) => {
   const order = await updateStaffOrder(req.params.id, req.staff, req.body ?? {});
+  if (!order) {
+    res.status(404).json({ message: "工单不存在或不属于当前员工" });
+    return;
+  }
+  res.json({ order });
+});
+
+app.post("/api/staff/orders/:id/unable", requireStaff, async (req, res) => {
+  const order = await markStaffOrderUnable(req.params.id, req.staff);
   if (!order) {
     res.status(404).json({ message: "工单不存在或不属于当前员工" });
     return;

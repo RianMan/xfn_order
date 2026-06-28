@@ -61,6 +61,7 @@ function normalizeOrder(order) {
     commissionAmount: DEFAULT_COMMISSION_AMOUNT,
     wageStatus: WAGE_PENDING,
     completedAt: "",
+    difficultyLevel: 0,
     paymentScreenshots: [],
     otherScreenshots: order.screenshots ?? [],
     assigneeAccount: "",
@@ -72,6 +73,7 @@ function normalizeOrder(order) {
     otherScreenshots: order.otherScreenshots ?? order.screenshots ?? [],
     discussion: Array.isArray(order.discussion) ? order.discussion : [],
     commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT,
+    difficultyLevel: Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0,
     wageStatus: order.wageStatus ?? WAGE_PENDING,
     completedAt: order.completedAt ?? "",
     status: order.status ?? "pending"
@@ -179,6 +181,7 @@ export async function updateOrder(id, patch) {
     "screenshots",
     "status",
     "commissionAmount",
+    "difficultyLevel",
     "wageStatus",
     "completedAt"
   ];
@@ -300,6 +303,23 @@ export async function updateStaffOrder(id, staff, patch) {
 
   appendStaffRemark(order, staff, patch.remarkAppend);
   order.handler = staff.name;
+  order.updatedAt = new Date().toISOString();
+  await saveOrders(orders);
+  return staffVisibleOrder(order);
+}
+
+export async function markStaffOrderUnable(id, staff) {
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
+  if (!order || order.status === "completed") return null;
+
+  order.difficultyLevel = (Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0) + 1;
+  order.processStatus = "无法处理";
+  appendStaffRemark(order, staff, `无法处理，退回公共池（难度 +1，当前难度 ${order.difficultyLevel}）`);
+  order.assigneeAccount = "";
+  order.assigneeName = "";
+  order.handler = "";
+  order.claimedAt = "";
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
   return staffVisibleOrder(order);
