@@ -21,7 +21,7 @@ const staffList = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
 const notice = ref("");
-const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "" });
+const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "", returnAddress: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
 const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
@@ -107,12 +107,13 @@ const filteredOrders = computed(() => {
     const difficultyOk =
       !filters.difficulty ||
       (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
+    const returnAddressOk = !filters.returnAddress || order.returnAddress === filters.returnAddress;
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, order.refundInfo, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && difficultyOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && returnAddressOk && keywordOk;
   });
 });
 
@@ -433,6 +434,7 @@ function resetFilters() {
   filters.processStatus = "";
   filters.assigneeAccount = "";
   filters.difficulty = "";
+  filters.returnAddress = "";
   pager.current = 1;
 }
 
@@ -516,6 +518,10 @@ loadOrders();
           <option value="">全部难度</option>
           <option value="hard">难单</option>
           <option value="normal">普通单</option>
+        </select>
+        <select v-model="filters.returnAddress" @change="pager.current = 1">
+          <option value="">全部退回地点</option>
+          <option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
         </select>
         <button type="button" @click="resetFilters">重置</button>
         <button type="button" @click="loadOrders">{{ tableLoading ? "刷新中" : "刷新" }}</button>

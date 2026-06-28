@@ -40,7 +40,13 @@ const loading = ref(false);
 const tableLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
-const filters = reactive({ keyword: "", processStatus: undefined, assigneeAccount: undefined, difficulty: undefined });
+const filters = reactive({
+  keyword: "",
+  processStatus: undefined,
+  assigneeAccount: undefined,
+  difficulty: undefined,
+  returnAddress: undefined
+});
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
@@ -123,12 +129,13 @@ const filteredOrders = computed(() => {
     const difficultyOk =
       !filters.difficulty ||
       (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
+    const returnAddressOk = !filters.returnAddress || order.returnAddress === filters.returnAddress;
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && difficultyOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && returnAddressOk && keywordOk;
   });
 });
 
@@ -467,6 +474,7 @@ function resetFilters() {
   filters.processStatus = undefined;
   filters.assigneeAccount = undefined;
   filters.difficulty = undefined;
+  filters.returnAddress = undefined;
   pager.current = 1;
 }
 
@@ -581,6 +589,15 @@ loadOrders();
             >
               <Select.Option value="hard">难单</Select.Option>
               <Select.Option value="normal">普通单</Select.Option>
+            </Select>
+            <Select
+              v-model:value="filters.returnAddress"
+              allow-clear
+              placeholder="全部退回地点"
+              style="width: 150px"
+              @change="pager.current = 1"
+            >
+              <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
             </Select>
             <Button @click="resetFilters">重置</Button>
           </Space>
