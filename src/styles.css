@@ -593,6 +593,33 @@ body {
   font-weight: 700;
 }
 
+.staff-search-clear {
+  align-items: center;
+  background: #fff3e0;
+  border: 0;
+  border-radius: 999px;
+  color: #b36b2e;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  width: 24px;
+}
+
+.staff-search-clear svg {
+  height: 14px;
+  width: 14px;
+}
+
+.staff-search-clear path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
 .staff-upload-btn {
   align-items: center;
   border: 1px solid #ffe0b2;
@@ -1130,6 +1157,40 @@ body {
 
 .staff-query-wide {
   grid-column: 1 / -1;
+}
+
+.staff-buyer-info {
+  background: #fffaf5;
+  border: 1px solid #ffe5c2;
+  border-radius: 10px;
+  padding: 9px;
+}
+
+.staff-buyer-main {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.staff-buyer-main em {
+  background: #fff3e0;
+  border-radius: 999px;
+  color: #ff6000;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  padding: 2px 7px;
+}
+
+.staff-buyer-info p {
+  color: #2b2118;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.55;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .staff-query-express {

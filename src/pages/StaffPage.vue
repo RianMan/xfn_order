@@ -11,7 +11,9 @@ const staffExpandedOrderIds = ref(new Set());
 const staffDiscussionDrafts = reactive({});
 const statusSheet = reactive({
   open: false,
-  order: null
+  order: null,
+  closing: false,
+  closeTimer: 0
 });
 const orderQuerySheet = reactive({
   open: false,
@@ -178,6 +180,11 @@ function updateOrderNumberFilter() {
   staffPager.current = 1;
 }
 
+function clearOrderNumberFilter() {
+  staffFilters.orderNumber = "";
+  updateOrderNumberFilter();
+}
+
 async function selectStaffFilter(type, value) {
   staffPager.current = 1;
   if (type === "refundInfo") {
@@ -193,18 +200,27 @@ function filterLabel(value, fallback) {
 }
 
 function openStatusSheet(order) {
+  window.clearTimeout(statusSheet.closeTimer);
   statusSheet.order = order;
+  statusSheet.closing = false;
   statusSheet.open = true;
 }
 
 function closeStatusSheet() {
+  window.clearTimeout(statusSheet.closeTimer);
   statusSheet.open = false;
   statusSheet.order = null;
+  statusSheet.closing = false;
 }
 
 function selectProcessStatus(value) {
+  if (statusSheet.closing) return;
   if (statusSheet.order) statusSheet.order.processStatus = value;
-  closeStatusSheet();
+  statusSheet.closing = true;
+  window.clearTimeout(statusSheet.closeTimer);
+  statusSheet.closeTimer = window.setTimeout(() => {
+    closeStatusSheet();
+  }, 360);
 }
 
 async function queryOrderDetail(order) {
@@ -502,6 +518,17 @@ if (staffLoggedIn.value) loadStaffOrders();
           placeholder="输入订单号查询"
           @input="updateOrderNumberFilter"
         />
+        <button
+          v-if="staffFilters.orderNumber"
+          type="button"
+          class="staff-search-clear"
+          aria-label="清空订单号搜索"
+          @click="clearOrderNumberFilter"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5" />
+          </svg>
+        </button>
       </label>
       <button class="staff-refresh-btn" @click="loadStaffOrders">刷新</button>
     </section>
@@ -676,11 +703,11 @@ if (staffLoggedIn.value) loadStaffOrders();
     </button>
   </main>
 
-  <div v-if="statusSheet.open" class="staff-sheet-backdrop" @click="closeStatusSheet">
-    <section class="staff-picker-sheet" @click.stop>
+  <div v-if="statusSheet.open" class="staff-sheet-backdrop" @click.stop.prevent="closeStatusSheet">
+    <section class="staff-picker-sheet" :class="{ closing: statusSheet.closing }" @click.stop @touchend.stop>
       <header>
         <strong>选择处理状态</strong>
-        <button type="button" @click="closeStatusSheet">关闭</button>
+        <button type="button" @click.stop.prevent="closeStatusSheet">关闭</button>
       </header>
       <div class="staff-picker-options">
         <button
@@ -688,7 +715,8 @@ if (staffLoggedIn.value) loadStaffOrders();
           :key="item"
           type="button"
           :class="{ active: statusSheet.order?.processStatus === item }"
-          @click="selectProcessStatus(item)"
+          @click.stop.prevent="selectProcessStatus(item)"
+          @touchend.stop.prevent="selectProcessStatus(item)"
         >
           <span>{{ item }}</span>
           <svg v-if="statusSheet.order?.processStatus === item" viewBox="0 0 16 16" aria-hidden="true">
@@ -728,6 +756,17 @@ if (staffLoggedIn.value) loadStaffOrders();
               <button type="button" @click="copy(item.phone)">{{ item.phone }} 复制</button>
             </div>
             <div v-if="item.inviter"><span>上级</span><b>{{ item.inviter }}</b></div>
+            <div v-if="item.buyerName || item.buyerPhone || item.buyerAddress" class="staff-query-wide staff-buyer-info">
+              <span>买家信息</span>
+              <div class="staff-buyer-main">
+                <b v-if="item.buyerName">{{ item.buyerName }}</b>
+                <em v-if="item.buyerPriority !== undefined && item.buyerPriority !== ''">优先级：{{ item.buyerPriority }}</em>
+              </div>
+              <button v-if="item.buyerPhone" type="button" @click="copy(item.buyerPhone)">{{ item.buyerPhone }} 复制</button>
+              <p v-if="item.buyerAddress">{{ item.buyerAddress }}</p>
+              <button v-if="item.buyerAddress" type="button" @click="copy(item.buyerAddress)">复制买家地址</button>
+              <button v-if="item.buyerCopyText" type="button" @click="copy(item.buyerCopyText)">复制完整买家信息</button>
+            </div>
             <div v-if="item.systemId"><span>系统编号</span><b>{{ item.systemId }}</b></div>
             <div v-if="item.orderNo"><span>订单号</span><b>{{ item.orderNo }}</b></div>
             <div><span>金额</span><b class="staff-query-price">¥{{ item.price }}</b></div>

@@ -21,6 +21,79 @@ function orderStatusLabel($, sourceId) {
     .find((text) => text && !["发货失败", "备注", "复制"].includes(text)) || "";
 }
 
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function nearestBuyerCopyNode($, previewDiv) {
+  const rowNode = $(previewDiv).closest("tr").find(".fuzhidingdan").first();
+  if (rowNode.length) return rowNode;
+
+  const elements = $("body *").toArray();
+  const previewIndex = elements.indexOf(previewDiv);
+  let nearest = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  $(".fuzhidingdan").each((_, el) => {
+    const index = elements.indexOf(el);
+    if (index < 0 || previewIndex < 0) return;
+    const distance = Math.abs(index - previewIndex);
+    if (distance < nearestDistance) {
+      nearest = el;
+      nearestDistance = distance;
+    }
+  });
+
+  return nearest ? $(nearest) : $();
+}
+
+function parseBuyerInfo($, previewDiv) {
+  const copyNode = nearestBuyerCopyNode($, previewDiv);
+  const row = copyNode.length ? copyNode.closest("tr") : $(previewDiv).closest("tr");
+  const copyText = copyNode.attr("id") || "";
+  const lines = copyText
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const priorityText = row
+    .find("span")
+    .map((_, el) => $(el).text())
+    .get()
+    .find((text) => text.includes("优先级")) || "";
+  const priority = priorityText.match(/优先级[:：]\s*(\d+)/)?.[1] || "";
+
+  if (lines.length >= 3) {
+    return {
+      buyerName: lines[0],
+      buyerPhone: lines[1],
+      buyerAddress: lines.slice(2).join("\n"),
+      buyerPriority: priority,
+      buyerCopyText: copyText
+    };
+  }
+
+  const buyerCell = copyNode.closest("td").length
+    ? copyNode.closest("td")
+    : row.find("td").filter((_, td) => $(td).find(".fuzhidingdan").length).first();
+  const cellLines = buyerCell
+    .find("> div")
+    .map((_, el) => cleanText($(el).clone().children().remove().end().text()))
+    .get()
+    .filter(Boolean);
+  const phone = cellLines.find((text) => /^1\d{10}$/.test(text)) || "";
+  const name = cellLines.find((text) => text !== phone && !text.includes("导入时间")) || "";
+  const address = cellLines.find((text) => text !== name && text !== phone && !text.includes("导入时间")) || "";
+
+  return {
+    buyerName: name,
+    buyerPhone: phone,
+    buyerAddress: address,
+    buyerPriority: priority,
+    buyerCopyText: [name, phone, address].filter(Boolean).join("\n")
+  };
+}
+
 function parseOrderQueryHtml(html) {
   const $ = cheerio.load(html);
   const orderMap = new Map();
@@ -60,6 +133,7 @@ function parseOrderQueryHtml(html) {
         .split(/[,，、\s]+/)
         .map((item) => item.trim())
         .filter(Boolean);
+      const buyerInfo = parseBuyerInfo($, div);
 
       orderMap.set(sourceId, {
         sourceId,
@@ -76,6 +150,7 @@ function parseOrderQueryHtml(html) {
         shopMasked: maskShopName(info.dpname || ""),
         uploadTime: info.shangchuantime || "",
         remark: $(div).attr("data-sj4") || "",
+        ...buyerInfo,
         screenshotUrls: screenshotUrl ? [screenshotUrl] : []
       });
     } catch {
