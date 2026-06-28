@@ -10,6 +10,8 @@ export const THIRD_PARTY_COOKIE = process.env.THIRD_PARTY_COOKIE || "";
 
 export const THIRD_PARTY_BASE_URL = process.env.THIRD_PARTY_BASE_URL || "https://enff8jbe9flh3mk9.lhxcx1.com";
 
+export const WECHAT_DB_PATH = process.env.WECHAT_DB_PATH || "/Users/shawvi/Desktop/wechat/data/orders.db";
+
 export const DEFAULT_IMPORT_PAYLOAD = {
   p: "1",
   fenyei: "10",

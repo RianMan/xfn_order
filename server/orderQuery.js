@@ -1,5 +1,7 @@
 import * as cheerio from "cheerio";
-import { THIRD_PARTY_BASE_URL, THIRD_PARTY_COOKIE } from "./config.js";
+import { DatabaseSync } from "node:sqlite";
+import { existsSync } from "node:fs";
+import { THIRD_PARTY_BASE_URL, THIRD_PARTY_COOKIE, WECHAT_DB_PATH } from "./config.js";
 
 function cleanImageUrl(url) {
   if (!url) return "";
@@ -91,6 +93,26 @@ function parseOrderQueryHtml(html) {
     .map((item, index) => ({ ...item, sortNo: index + 1 }));
 }
 
+function readInviter(phone) {
+  const cleanPhone = String(phone || "").trim();
+  if (!cleanPhone || !existsSync(WECHAT_DB_PATH)) return "";
+
+  let db;
+  try {
+    db = new DatabaseSync(WECHAT_DB_PATH, { readOnly: true });
+    const row = db.prepare("SELECT inviter FROM members WHERE phone = ?").get(cleanPhone);
+    return row?.inviter || "";
+  } catch {
+    return "";
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      // Ignore close errors for this optional lookup.
+    }
+  }
+}
+
 export async function queryUpstreamOrder(orderNo) {
   const keyword = String(orderNo || "").trim();
   if (!keyword) return { success: false, msg: "请输入订单号" };
@@ -137,7 +159,10 @@ export async function queryUpstreamOrder(orderNo) {
     return { success: false, msg: "第三方登录已过期，请联系管理员更新 Cookie" };
   }
 
-  const results = parseOrderQueryHtml(html);
+  const results = parseOrderQueryHtml(html).map((item) => ({
+    ...item,
+    inviter: readInviter(item.phone)
+  }));
   return {
     success: true,
     results,

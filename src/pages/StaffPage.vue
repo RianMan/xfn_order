@@ -7,7 +7,7 @@ const staffFilters = reactive({ processStatus: "", refundInfo: "", orderNumber: 
 const staffTab = ref("claimable");
 const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
-const staffExpandedOrders = reactive({});
+const staffExpandedOrderIds = ref(new Set());
 const staffDiscussionDrafts = reactive({});
 const orderQuerySheet = reactive({
   open: false,
@@ -259,14 +259,14 @@ async function markUnable(order) {
 
 function isStaffOrderExpanded(order) {
   if (staffTab.value !== "mine") return true;
-  if (Object.prototype.hasOwnProperty.call(staffExpandedOrders, order.id)) {
-    return staffExpandedOrders[order.id];
-  }
-  return false;
+  return staffExpandedOrderIds.value.has(order.id);
 }
 
 function toggleStaffOrder(order) {
-  staffExpandedOrders[order.id] = !isStaffOrderExpanded(order);
+  const next = new Set(staffExpandedOrderIds.value);
+  if (next.has(order.id)) next.delete(order.id);
+  else next.add(order.id);
+  staffExpandedOrderIds.value = next;
 }
 
 async function saveStaffOrder(record, options = {}) {
@@ -489,8 +489,8 @@ if (staffLoggedIn.value) loadStaffOrders();
 
     <section class="staff-card-list">
       <article v-for="(order, index) in pagedStaffOrders" :key="order.id" class="staff-order-card">
-        <div class="staff-card-top">
-          <button type="button" class="staff-copy-order" :disabled="orderQuerySheet.loading" @click="queryOrderDetail(order)">
+        <div class="staff-card-top" :class="{ clickable: staffTab === 'mine' }" @click="staffTab === 'mine' && toggleStaffOrder(order)">
+          <button type="button" class="staff-copy-order" :disabled="orderQuerySheet.loading" @click.stop="queryOrderDetail(order)">
             {{ orderQuerySheet.loading && orderQuerySheet.orderNo === order.orderNumber ? "查询中..." : order.orderNumber }}
           </button>
           <div class="staff-card-actions">
@@ -501,7 +501,7 @@ if (staffLoggedIn.value) loadStaffOrders();
               class="staff-collapse-btn"
               :class="{ open: isStaffOrderExpanded(order) }"
               :aria-label="isStaffOrderExpanded(order) ? '收拢工单' : '展开工单'"
-              @click="toggleStaffOrder(order)"
+              @click.stop="toggleStaffOrder(order)"
             >
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M4 6l4 4 4-4" />
@@ -682,6 +682,7 @@ if (staffLoggedIn.value) loadStaffOrders();
               <span>手机号</span>
               <button type="button" @click="copy(item.phone)">{{ item.phone }} 复制</button>
             </div>
+            <div v-if="item.inviter"><span>上级</span><b>{{ item.inviter }}</b></div>
             <div v-if="item.systemId"><span>系统编号</span><b>{{ item.systemId }}</b></div>
             <div v-if="item.orderNo"><span>订单号</span><b>{{ item.orderNo }}</b></div>
             <div><span>金额</span><b class="staff-query-price">¥{{ item.price }}</b></div>

@@ -659,6 +659,10 @@ body {
   justify-content: space-between;
 }
 
+.staff-card-top.clickable {
+  cursor: pointer;
+}
+
 .staff-card-actions {
   align-items: center;
   display: flex;
