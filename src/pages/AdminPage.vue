@@ -40,7 +40,7 @@ const loading = ref(false);
 const tableLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
-const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "" });
+const filters = reactive({ keyword: "", processStatus: undefined, assigneeAccount: undefined, difficulty: undefined });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
@@ -338,6 +338,10 @@ function updateAssignee(record, account) {
   record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
 }
 
+function updateOptionalField(record, field, value) {
+  record[field] = value || "";
+}
+
 async function saveOrder(record) {
   if (!record) return;
   try {
@@ -460,9 +464,9 @@ function copy(value) {
 
 function resetFilters() {
   filters.keyword = "";
-  filters.processStatus = "";
-  filters.assigneeAccount = "";
-  filters.difficulty = "";
+  filters.processStatus = undefined;
+  filters.assigneeAccount = undefined;
+  filters.difficulty = undefined;
   pager.current = 1;
 }
 
@@ -622,7 +626,13 @@ loadOrders();
             </template>
 
             <template v-else-if="column.key === 'shipped'">
-              <Select v-model:value="record.shipped" allow-clear placeholder="选择" style="width: 100%">
+              <Select
+                :value="record.shipped || undefined"
+                allow-clear
+                placeholder="选择是否寄出"
+                style="width: 100%"
+                @change="value => updateOptionalField(record, 'shipped', value)"
+              >
                 <Select.Option v-for="item in SHIPPED_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
               </Select>
             </template>
@@ -632,7 +642,13 @@ loadOrders();
             </template>
 
             <template v-else-if="column.key === 'returnAddress'">
-              <Select v-model:value="record.returnAddress" allow-clear placeholder="选择" style="width: 100%">
+              <Select
+                :value="record.returnAddress || undefined"
+                allow-clear
+                placeholder="选择退货地址"
+                style="width: 100%"
+                @change="value => updateOptionalField(record, 'returnAddress', value)"
+              >
                 <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
               </Select>
             </template>

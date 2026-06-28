@@ -9,6 +9,10 @@ const staffPager = reactive({ current: 1, pageSize: 8 });
 const staffRemarkDrafts = reactive({});
 const staffExpandedOrderIds = ref(new Set());
 const staffDiscussionDrafts = reactive({});
+const statusSheet = reactive({
+  open: false,
+  order: null
+});
 const orderQuerySheet = reactive({
   open: false,
   loading: false,
@@ -186,6 +190,21 @@ async function selectStaffFilter(type, value) {
 
 function filterLabel(value, fallback) {
   return value || fallback;
+}
+
+function openStatusSheet(order) {
+  statusSheet.order = order;
+  statusSheet.open = true;
+}
+
+function closeStatusSheet() {
+  statusSheet.open = false;
+  statusSheet.order = null;
+}
+
+function selectProcessStatus(value) {
+  if (statusSheet.order) statusSheet.order.processStatus = value;
+  closeStatusSheet();
 }
 
 async function queryOrderDetail(order) {
@@ -578,9 +597,12 @@ if (staffLoggedIn.value) loadStaffOrders();
             </div>
             <div class="staff-form-grid">
               <label>处理状态
-                <select v-model="order.processStatus">
-                  <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
-                </select>
+                <button type="button" class="staff-select-trigger" @click="openStatusSheet(order)">
+                  <span>{{ order.processStatus || "选择处理状态" }}</span>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M4 6l4 4 4-4" />
+                  </svg>
+                </button>
               </label>
             </div>
             <label>已有备注
@@ -653,6 +675,29 @@ if (staffLoggedIn.value) loadStaffOrders();
       <span>点击关闭</span>
     </button>
   </main>
+
+  <div v-if="statusSheet.open" class="staff-sheet-backdrop" @click="closeStatusSheet">
+    <section class="staff-picker-sheet" @click.stop>
+      <header>
+        <strong>选择处理状态</strong>
+        <button type="button" @click="closeStatusSheet">关闭</button>
+      </header>
+      <div class="staff-picker-options">
+        <button
+          v-for="item in PROCESS_OPTIONS"
+          :key="item"
+          type="button"
+          :class="{ active: statusSheet.order?.processStatus === item }"
+          @click="selectProcessStatus(item)"
+        >
+          <span>{{ item }}</span>
+          <svg v-if="statusSheet.order?.processStatus === item" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+          </svg>
+        </button>
+      </div>
+    </section>
+  </div>
 
   <div v-if="orderQuerySheet.open" class="staff-sheet-backdrop" @click="closeOrderQuerySheet">
     <section class="staff-order-sheet" @click.stop>
