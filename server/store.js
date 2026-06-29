@@ -160,6 +160,144 @@ export async function readAdminOrders(scope = "active") {
   return filterOrdersByScope(await readOrders(), scope);
 }
 
+function dateKey(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match && !text.includes("T")) return `${match[1]}-${match[2]}-${match[3]}`;
+  if (!text) return "";
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function numericAmount(value, fallback = 0) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : fallback;
+}
+
+function dayRange(days = 14) {
+  const result = [];
+  const now = new Date();
+  for (let index = days - 1; index >= 0; index -= 1) {
+    const date = new Date(now);
+    date.setDate(now.getDate() - index);
+    result.push(dateKey(date.toISOString()));
+  }
+  return result;
+}
+
+function emptyTrendItem(date) {
+  return {
+    date,
+    newOrders: 0,
+    claimedOrders: 0,
+    paidOrders: 0,
+    paymentAmount: 0
+  };
+}
+
+function isPaidOrder(order) {
+  return order.status === "completed" || order.processStatus === "已回款";
+}
+
+function markPaidIfNeeded(order, patch) {
+  if (patch?.processStatus !== "已回款") return;
+  order.status = "completed";
+  order.completedAt = order.completedAt || new Date().toISOString();
+  order.wageStatus = order.wageStatus || WAGE_PENDING;
+  order.commissionAmount = Number.isFinite(Number(order.commissionAmount))
+    ? Number(order.commissionAmount)
+    : DEFAULT_COMMISSION_AMOUNT;
+}
+
+export async function readDashboardMetrics(days = 14) {
+  const orders = await readOrders();
+  const dates = dayRange(days);
+  const trendMap = new Map(dates.map((date) => [date, emptyTrendItem(date)]));
+  const today = dates.at(-1) || dateKey(new Date().toISOString());
+  const statusMap = new Map();
+  const assigneeMap = new Map();
+
+  let active = 0;
+  let paid = 0;
+  let pending = 0;
+  let processing = 0;
+  let difficult = 0;
+  let unassigned = 0;
+  let paymentAmount = 0;
+
+  for (const order of orders) {
+    const processStatus = order.processStatus || "未处理";
+    statusMap.set(processStatus, (statusMap.get(processStatus) || 0) + 1);
+
+    const newDate = dateKey(order.receivedAt || order.appliedAt || order.createdAt || order.syncedAt);
+    if (trendMap.has(newDate)) trendMap.get(newDate).newOrders += 1;
+
+    const claimedDate = dateKey(order.claimedAt);
+    if (trendMap.has(claimedDate)) trendMap.get(claimedDate).claimedOrders += 1;
+
+    if (isPaidOrder(order)) {
+      paid += 1;
+      const amount = numericAmount(order.commissionAmount, DEFAULT_COMMISSION_AMOUNT);
+      paymentAmount += amount;
+      const paidDate = dateKey(order.completedAt || order.updatedAt);
+      if (trendMap.has(paidDate)) {
+        trendMap.get(paidDate).paidOrders += 1;
+        trendMap.get(paidDate).paymentAmount += amount;
+      }
+    } else {
+      active += 1;
+    }
+
+    if (processStatus === "未处理") pending += 1;
+    if (["联系中", "加好友中", "加不到拍手"].includes(processStatus)) processing += 1;
+    if (Number(order.difficultyLevel || 0) > 0) difficult += 1;
+    if (!order.assigneeAccount && !isPaidOrder(order)) unassigned += 1;
+
+    const assigneeName = order.assigneeName || order.handler || "";
+    if (assigneeName) {
+      const item = assigneeMap.get(assigneeName) || { name: assigneeName, claimed: 0, paid: 0, active: 0 };
+      item.claimed += order.claimedAt ? 1 : 0;
+      item.paid += isPaidOrder(order) ? 1 : 0;
+      item.active += isPaidOrder(order) ? 0 : 1;
+      assigneeMap.set(assigneeName, item);
+    }
+  }
+
+  const trend = dates.map((date) => trendMap.get(date));
+  const todayTrend = trendMap.get(today) || emptyTrendItem(today);
+  const statusDistribution = Array.from(statusMap, ([name, value]) => ({ name, value }));
+  const assigneeRanking = Array.from(assigneeMap.values())
+    .sort((a, b) => b.paid - a.paid || b.claimed - a.claimed || b.active - a.active)
+    .slice(0, 8);
+
+  return {
+    updatedAt: new Date().toISOString(),
+    summary: {
+      total: orders.length,
+      active,
+      pending,
+      processing,
+      paid,
+      difficult,
+      unassigned,
+      paymentAmount,
+      todayNew: todayTrend.newOrders,
+      todayPaid: todayTrend.paidOrders,
+      todayPaymentAmount: todayTrend.paymentAmount
+    },
+    trend,
+    statusDistribution,
+    assigneeRanking
+  };
+}
+
 export async function updateOrder(id, patch) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id);
@@ -205,6 +343,7 @@ export async function updateOrder(id, patch) {
   if ("commissionAmount" in patch) {
     order.commissionAmount = Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT;
   }
+  markPaidIfNeeded(order, patch);
 
   order.updatedAt = new Date().toISOString();
   await saveOrders(orders);
@@ -311,6 +450,7 @@ export async function updateStaffOrder(id, staff, patch) {
     if (field in patch) order[field] = patch[field];
   }
 
+  markPaidIfNeeded(order, patch);
   appendStaffRemark(order, staff, patch.remarkAppend);
   order.handler = staff.name;
   order.updatedAt = new Date().toISOString();

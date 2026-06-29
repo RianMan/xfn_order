@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
+import * as echarts from "echarts";
 import {
   Button,
   Card,
@@ -38,8 +39,14 @@ const importParams = reactive({
 const orders = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
+const dashboardLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
+const dashboardData = ref(null);
+const trendChartRef = ref(null);
+const statusChartRef = ref(null);
+const assigneeChartRef = ref(null);
+const chartInstances = [];
 const filters = reactive({
   keyword: "",
   processStatus: undefined,
@@ -109,6 +116,31 @@ async function readUploadResponse(response) {
 }
 
 const orderScope = computed(() => (activeTab.value === "history" ? "history" : "active"));
+
+const pageMeta = computed(() => {
+  if (activeTab.value === "dashboard") {
+    return {
+      title: "处理进度大盘",
+      subtitle: "按天查看售后新增、处理领取、回款完成和员工处理情况"
+    };
+  }
+  if (activeTab.value === "orders") {
+    return {
+      title: "订单补充台账",
+      subtitle: "三方接口同步，订单重复不覆盖"
+    };
+  }
+  if (activeTab.value === "history") {
+    return {
+      title: "历史订单",
+      subtitle: "已完结订单，维护佣金和工资发放状态"
+    };
+  }
+  return {
+    title: "员工管理",
+    subtitle: "添加员工账号，供移动端领取工单使用"
+  };
+});
 
 const stats = computed(() => ({
   total: orders.value.length,
@@ -189,7 +221,7 @@ async function doLogin() {
     });
     localStorage.setItem("adminToken", data.token);
     loggedIn.value = true;
-    await loadOrders();
+    await loadDashboard();
     antMessage.success("登录成功");
   } catch (err) {
     antMessage.error(err.message);
@@ -200,6 +232,111 @@ function logout() {
   localStorage.removeItem("adminToken");
   loggedIn.value = false;
   orders.value = [];
+  dashboardData.value = null;
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function disposeCharts() {
+  while (chartInstances.length) {
+    chartInstances.pop()?.dispose();
+  }
+}
+
+function mountChart(el, option) {
+  if (!el) return;
+  const chart = echarts.init(el);
+  chart.setOption(option);
+  chartInstances.push(chart);
+}
+
+function resizeCharts() {
+  for (const chart of chartInstances) chart.resize();
+}
+
+function renderDashboardCharts() {
+  disposeCharts();
+  const data = dashboardData.value;
+  if (!data) return;
+
+  const dates = data.trend.map((item) => item.date.slice(5));
+  mountChart(trendChartRef.value, {
+    color: ["#1677ff", "#13c2c2", "#52c41a", "#faad14"],
+    tooltip: { trigger: "axis" },
+    legend: { top: 0, data: ["新增订单", "领取处理", "已回款", "回款金额"] },
+    grid: { left: 42, right: 44, top: 48, bottom: 28 },
+    xAxis: { type: "category", boundaryGap: false, data: dates },
+    yAxis: [
+      { type: "value", minInterval: 1 },
+      { type: "value", minInterval: 1, axisLabel: { formatter: "{value}元" } }
+    ],
+    series: [
+      { name: "新增订单", type: "line", smooth: true, data: data.trend.map((item) => item.newOrders) },
+      { name: "领取处理", type: "line", smooth: true, data: data.trend.map((item) => item.claimedOrders) },
+      { name: "已回款", type: "bar", data: data.trend.map((item) => item.paidOrders) },
+      { name: "回款金额", type: "line", smooth: true, yAxisIndex: 1, data: data.trend.map((item) => Number(item.paymentAmount || 0).toFixed(2)) }
+    ]
+  });
+
+  mountChart(statusChartRef.value, {
+    color: ["#1677ff", "#52c41a", "#faad14", "#ff7875", "#722ed1", "#13c2c2"],
+    tooltip: { trigger: "item" },
+    legend: { bottom: 0, type: "scroll" },
+    series: [{
+      name: "处理状态",
+      type: "pie",
+      radius: ["48%", "70%"],
+      center: ["50%", "44%"],
+      avoidLabelOverlap: true,
+      label: { formatter: "{b}\n{c}单" },
+      data: data.statusDistribution
+    }]
+  });
+
+  mountChart(assigneeChartRef.value, {
+    color: ["#52c41a", "#1677ff", "#faad14"],
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    legend: { top: 0, data: ["已回款", "领取量", "处理中"] },
+    grid: { left: 42, right: 20, top: 42, bottom: 28 },
+    xAxis: { type: "category", data: data.assigneeRanking.map((item) => item.name) },
+    yAxis: { type: "value", minInterval: 1 },
+    series: [
+      { name: "已回款", type: "bar", data: data.assigneeRanking.map((item) => item.paid) },
+      { name: "领取量", type: "bar", data: data.assigneeRanking.map((item) => item.claimed) },
+      { name: "处理中", type: "bar", data: data.assigneeRanking.map((item) => item.active) }
+    ]
+  });
+}
+
+async function loadDashboard() {
+  if (!loggedIn.value) return;
+  dashboardLoading.value = true;
+  try {
+    dashboardData.value = await request("/api/admin/dashboard?days=14");
+    dashboardLoading.value = false;
+    await nextTick();
+    renderDashboardCharts();
+  } catch (err) {
+    antMessage.error(err.message || "大盘加载失败");
+  } finally {
+    dashboardLoading.value = false;
+  }
+}
+
+async function switchTab(tab) {
+  activeTab.value = tab;
+  if (tab === "dashboard") {
+    await loadDashboard();
+    return;
+  }
+  if (tab === "staff") {
+    await loadStaffList();
+    return;
+  }
+  pager.current = 1;
+  await loadOrders();
 }
 
 async function loadOrders() {
@@ -479,6 +616,12 @@ function resetFilters() {
 }
 
 loadOrders();
+if (activeTab.value === "dashboard") loadDashboard();
+window.addEventListener("resize", resizeCharts);
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", resizeCharts);
+  disposeCharts();
+});
 </script>
 
 <template>
@@ -507,12 +650,13 @@ loadOrders();
         <span>After-sales</span>
       </div>
       <nav class="top-menu">
-        <button :class="{ active: activeTab === 'orders' }" @click="activeTab = 'orders'; pager.current = 1; loadOrders()">订单台账</button>
-        <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'; pager.current = 1; loadOrders()">历史订单</button>
-        <button :class="{ active: activeTab === 'staff' }" @click="activeTab = 'staff'; loadStaffList()">员工管理</button>
+        <button :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">订单台账</button>
+        <button :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
+        <button :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史订单</button>
+        <button :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">员工管理</button>
       </nav>
       <Space>
-        <Button :loading="tableLoading" @click="loadOrders">刷新</Button>
+        <Button :loading="activeTab === 'dashboard' ? dashboardLoading : tableLoading" @click="activeTab === 'dashboard' ? loadDashboard() : loadOrders()">刷新</Button>
         <Button @click="logout">
           <template #icon><LogoutOutlined /></template>
           退出
@@ -522,12 +666,82 @@ loadOrders();
 
     <section class="page-title">
       <div>
-        <h1>{{ activeTab === "orders" ? "订单补充台账" : activeTab === "history" ? "历史订单" : "员工管理" }}</h1>
-        <span>{{ activeTab === "orders" ? "三方接口同步，订单重复不覆盖" : activeTab === "history" ? "已完结订单，维护佣金和工资发放状态" : "添加员工账号，供移动端领取工单使用" }}</span>
+        <h1>{{ pageMeta.title }}</h1>
+        <span>{{ pageMeta.subtitle }}</span>
       </div>
     </section>
 
-    <section v-if="activeTab === 'orders' || activeTab === 'history'" class="admin-content">
+    <section v-if="activeTab === 'dashboard'" class="admin-content dashboard-content">
+      <Row :gutter="16" class="stats-row">
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="今日新增售后" :value="dashboardData?.summary?.todayNew || 0" suffix="单" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="今日已回款" :value="dashboardData?.summary?.todayPaid || 0" suffix="单" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="今日回款金额" :value="formatMoney(dashboardData?.summary?.todayPaymentAmount)" prefix="¥" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="公共池待领" :value="dashboardData?.summary?.unassigned || 0" suffix="单" />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row :gutter="16" class="stats-row">
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="全部售后订单" :value="dashboardData?.summary?.total || 0" suffix="单" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="进行中订单" :value="dashboardData?.summary?.active || 0" suffix="单" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="累计回款订单" :value="dashboardData?.summary?.paid || 0" suffix="单" />
+          </Card>
+        </Col>
+        <Col :span="6">
+          <Card :loading="dashboardLoading">
+            <Statistic title="累计回款金额" :value="formatMoney(dashboardData?.summary?.paymentAmount)" prefix="¥" />
+          </Card>
+        </Col>
+      </Row>
+
+      <Card class="dashboard-chart-card" title="近 14 天订单处理趋势" :loading="dashboardLoading">
+        <div ref="trendChartRef" class="dashboard-chart large"></div>
+      </Card>
+
+      <Row :gutter="16">
+        <Col :span="10">
+          <Card class="dashboard-chart-card" title="当前处理状态分布" :loading="dashboardLoading">
+            <div ref="statusChartRef" class="dashboard-chart"></div>
+          </Card>
+        </Col>
+        <Col :span="14">
+          <Card class="dashboard-chart-card" title="员工处理排行" :loading="dashboardLoading">
+            <div ref="assigneeChartRef" class="dashboard-chart"></div>
+          </Card>
+        </Col>
+      </Row>
+
+      <div class="dashboard-sync-note">
+        <span>后台服务已配置北京时间每天 00:00 自动同步上游订单，大盘刷新后会展示最新同步结果。</span>
+        <span v-if="dashboardData?.updatedAt">最后统计：{{ formatDiscussionTime(dashboardData.updatedAt) }}</span>
+      </div>
+    </section>
+
+    <section v-else-if="activeTab === 'orders' || activeTab === 'history'" class="admin-content">
       <Row :gutter="16" class="stats-row">
         <Col :span="6"><Card><Statistic title="总工单" :value="stats.total" /></Card></Col>
         <Col :span="6"><Card><Statistic title="未处理" :value="stats.pending" /></Card></Col>

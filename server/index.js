@@ -16,6 +16,7 @@ import {
   dedupeExistingOrders,
   importOrders,
   markStaffOrderUnable,
+  readDashboardMetrics,
   readAdminOrders,
   readClaimableOrders,
   readOrders,
@@ -24,6 +25,7 @@ import {
   updateStaffOrder
 } from "./store.js";
 import { createStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
+import { syncUpstreamOrders } from "./sync.js";
 import { annotateUpstreamOrder, completeUpstreamOrder } from "./upstream.js";
 
 const app = express();
@@ -63,6 +65,35 @@ function persistSessions() {
     admin: Array.from(sessions),
     staff: Object.fromEntries(staffSessions)
   }, null, 2));
+}
+
+function nextBeijingMidnightDelay() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((item) => [item.type, item.value]));
+  const midnight = new Date(`${values.year}-${values.month}-${values.day}T00:00:00+08:00`);
+  if (midnight <= now) midnight.setUTCDate(midnight.getUTCDate() + 1);
+  return midnight.getTime() - now.getTime();
+}
+
+function scheduleDailyUpstreamSync() {
+  const run = async () => {
+    try {
+      const result = await syncUpstreamOrders();
+      console.log("[daily sync]", JSON.stringify(result));
+    } catch (err) {
+      console.error("[daily sync failed]", err);
+    } finally {
+      setTimeout(run, nextBeijingMidnightDelay());
+    }
+  };
+
+  setTimeout(run, nextBeijingMidnightDelay());
 }
 
 function getToken(req) {
@@ -130,6 +161,11 @@ app.post("/api/login", (req, res) => {
 
 app.get("/api/admin/orders", requireAdmin, async (req, res) => {
   res.json({ orders: await readAdminOrders(req.query.scope || "active") });
+});
+
+app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+  const days = Number(req.query.days || 14);
+  res.json(await readDashboardMetrics(Number.isFinite(days) ? days : 14));
 });
 
 app.get("/api/admin/staff", requireAdmin, async (_req, res) => {
@@ -364,4 +400,5 @@ app.get(["/m/admin", "/m/admin/*"], (_req, res) => {
 
 app.listen(port, () => {
   console.log(`After-sales API listening on http://localhost:${port}`);
+  scheduleDailyUpstreamSync();
 });
