@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import {
   Button,
   Card,
@@ -42,11 +42,6 @@ const dashboardLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
 const dashboardData = ref(null);
-const trendChartRef = ref(null);
-const statusChartRef = ref(null);
-const assigneeChartRef = ref(null);
-const chartInstances = [];
-let echartsApi;
 const filters = reactive({
   keyword: "",
   processStatus: undefined,
@@ -213,6 +208,78 @@ const staffColumns = [
   { title: "操作", key: "action", width: 120 }
 ];
 
+const trendChart = computed(() => {
+  const trend = dashboardData.value?.trend || [];
+  const width = 920;
+  const height = 300;
+  const pad = { top: 28, right: 18, bottom: 36, left: 34 };
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const maxValue = Math.max(
+    1,
+    ...trend.flatMap((item) => [
+      Number(item.newOrders || 0),
+      Number(item.claimedOrders || 0),
+      Number(item.paidOrders || 0),
+      Number(item.paymentAmount || 0)
+    ])
+  );
+  const x = (index) => pad.left + (trend.length <= 1 ? 0 : (plotWidth * index) / (trend.length - 1));
+  const y = (value) => pad.top + plotHeight - (plotHeight * Number(value || 0)) / maxValue;
+  const points = (field) => trend.map((item, index) => `${x(index)},${y(item[field])}`).join(" ");
+  const bars = trend.map((item, index) => {
+    const cx = x(index);
+    const barWidth = Math.max(8, Math.min(24, plotWidth / Math.max(trend.length, 1) - 10));
+    const barY = y(item.paidOrders);
+    return {
+      x: cx - barWidth / 2,
+      y: barY,
+      width: barWidth,
+      height: pad.top + plotHeight - barY,
+      label: item.date.slice(5)
+    };
+  });
+
+  return {
+    width,
+    height,
+    pad,
+    plotWidth,
+    plotHeight,
+    maxValue,
+    labels: trend.map((item, index) => ({
+      x: x(index),
+      text: item.date.slice(5),
+      show: index === 0 || index === trend.length - 1 || index % 3 === 0
+    })),
+    bars,
+    newLine: points("newOrders"),
+    claimedLine: points("claimedOrders"),
+    amountLine: points("paymentAmount")
+  };
+});
+
+const statusRows = computed(() => {
+  const rows = dashboardData.value?.statusDistribution || [];
+  const max = Math.max(1, ...rows.map((item) => Number(item.value || 0)));
+  return rows.map((item, index) => ({
+    ...item,
+    color: ["#1677ff", "#52c41a", "#faad14", "#ff7875", "#722ed1", "#13c2c2"][index % 6],
+    percent: Math.round((Number(item.value || 0) / max) * 100)
+  }));
+});
+
+const assigneeRows = computed(() => {
+  const rows = dashboardData.value?.assigneeRanking || [];
+  const max = Math.max(1, ...rows.flatMap((item) => [item.paid, item.claimed, item.active].map((value) => Number(value || 0))));
+  return rows.map((item) => ({
+    ...item,
+    paidPercent: Math.round((Number(item.paid || 0) / max) * 100),
+    claimedPercent: Math.round((Number(item.claimed || 0) / max) * 100),
+    activePercent: Math.round((Number(item.active || 0) / max) * 100)
+  }));
+});
+
 async function doLogin() {
   try {
     const data = await request("/api/login", {
@@ -239,91 +306,11 @@ function formatMoney(value) {
   return Number(value || 0).toFixed(2);
 }
 
-function disposeCharts() {
-  while (chartInstances.length) {
-    chartInstances.pop()?.dispose();
-  }
-}
-
-function mountChart(el, option) {
-  if (!el) return;
-  const chart = echarts.init(el);
-  chart.setOption(option);
-  chartInstances.push(chart);
-}
-
-function resizeCharts() {
-  for (const chart of chartInstances) chart.resize();
-}
-
-async function loadEcharts() {
-  if (!echartsApi) echartsApi = await import("echarts");
-  return echartsApi;
-}
-
-async function renderDashboardCharts() {
-  disposeCharts();
-  const data = dashboardData.value;
-  if (!data) return;
-  const echarts = await loadEcharts();
-
-  const dates = data.trend.map((item) => item.date.slice(5));
-  mountChart(trendChartRef.value, {
-    color: ["#1677ff", "#13c2c2", "#52c41a", "#faad14"],
-    tooltip: { trigger: "axis" },
-    legend: { top: 0, data: ["新增订单", "领取处理", "已回款", "回款金额"] },
-    grid: { left: 42, right: 44, top: 48, bottom: 28 },
-    xAxis: { type: "category", boundaryGap: false, data: dates },
-    yAxis: [
-      { type: "value", minInterval: 1 },
-      { type: "value", minInterval: 1, axisLabel: { formatter: "{value}元" } }
-    ],
-    series: [
-      { name: "新增订单", type: "line", smooth: true, data: data.trend.map((item) => item.newOrders) },
-      { name: "领取处理", type: "line", smooth: true, data: data.trend.map((item) => item.claimedOrders) },
-      { name: "已回款", type: "bar", data: data.trend.map((item) => item.paidOrders) },
-      { name: "回款金额", type: "line", smooth: true, yAxisIndex: 1, data: data.trend.map((item) => Number(item.paymentAmount || 0).toFixed(2)) }
-    ]
-  });
-
-  mountChart(statusChartRef.value, {
-    color: ["#1677ff", "#52c41a", "#faad14", "#ff7875", "#722ed1", "#13c2c2"],
-    tooltip: { trigger: "item" },
-    legend: { bottom: 0, type: "scroll" },
-    series: [{
-      name: "处理状态",
-      type: "pie",
-      radius: ["48%", "70%"],
-      center: ["50%", "44%"],
-      avoidLabelOverlap: true,
-      label: { formatter: "{b}\n{c}单" },
-      data: data.statusDistribution
-    }]
-  });
-
-  mountChart(assigneeChartRef.value, {
-    color: ["#52c41a", "#1677ff", "#faad14"],
-    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-    legend: { top: 0, data: ["已回款", "领取量", "处理中"] },
-    grid: { left: 42, right: 20, top: 42, bottom: 28 },
-    xAxis: { type: "category", data: data.assigneeRanking.map((item) => item.name) },
-    yAxis: { type: "value", minInterval: 1 },
-    series: [
-      { name: "已回款", type: "bar", data: data.assigneeRanking.map((item) => item.paid) },
-      { name: "领取量", type: "bar", data: data.assigneeRanking.map((item) => item.claimed) },
-      { name: "处理中", type: "bar", data: data.assigneeRanking.map((item) => item.active) }
-    ]
-  });
-}
-
 async function loadDashboard() {
   if (!loggedIn.value) return;
   dashboardLoading.value = true;
   try {
     dashboardData.value = await request("/api/admin/dashboard?days=14");
-    dashboardLoading.value = false;
-    await nextTick();
-    renderDashboardCharts();
   } catch (err) {
     antMessage.error(err.message || "大盘加载失败");
   } finally {
@@ -623,11 +610,6 @@ function resetFilters() {
 
 loadOrders();
 if (activeTab.value === "dashboard") loadDashboard();
-window.addEventListener("resize", resizeCharts);
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", resizeCharts);
-  disposeCharts();
-});
 </script>
 
 <template>
@@ -725,18 +707,88 @@ onBeforeUnmount(() => {
       </Row>
 
       <Card class="dashboard-chart-card" title="近 14 天订单处理趋势" :loading="dashboardLoading">
-        <div ref="trendChartRef" class="dashboard-chart large"></div>
+        <div class="dashboard-chart large">
+          <div class="chart-legend">
+            <span><i class="legend-dot blue"></i>新增订单</span>
+            <span><i class="legend-dot cyan"></i>领取处理</span>
+            <span><i class="legend-dot green"></i>已回款</span>
+            <span><i class="legend-dot amber"></i>回款金额</span>
+          </div>
+          <svg class="trend-svg" :viewBox="`0 0 ${trendChart.width} ${trendChart.height}`" role="img">
+            <line
+              :x1="trendChart.pad.left"
+              :y1="trendChart.pad.top + trendChart.plotHeight"
+              :x2="trendChart.pad.left + trendChart.plotWidth"
+              :y2="trendChart.pad.top + trendChart.plotHeight"
+              stroke="#e2e8f0"
+            />
+            <line
+              :x1="trendChart.pad.left"
+              :y1="trendChart.pad.top"
+              :x2="trendChart.pad.left"
+              :y2="trendChart.pad.top + trendChart.plotHeight"
+              stroke="#e2e8f0"
+            />
+            <text :x="trendChart.pad.left" :y="18" fill="#94a3b8" font-size="12">峰值 {{ trendChart.maxValue }}</text>
+            <rect
+              v-for="(bar, index) in trendChart.bars"
+              :key="`paid-${index}`"
+              :x="bar.x"
+              :y="bar.y"
+              :width="bar.width"
+              :height="bar.height"
+              fill="#52c41a"
+              opacity="0.26"
+              rx="3"
+            />
+            <polyline :points="trendChart.newLine" fill="none" stroke="#1677ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline :points="trendChart.claimedLine" fill="none" stroke="#13c2c2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline :points="trendChart.amountLine" fill="none" stroke="#faad14" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <g v-for="label in trendChart.labels" :key="label.text">
+              <text v-if="label.show" :x="label.x" :y="trendChart.height - 10" text-anchor="middle" fill="#64748b" font-size="11">{{ label.text }}</text>
+            </g>
+          </svg>
+        </div>
       </Card>
 
       <Row :gutter="16">
         <Col :span="10">
           <Card class="dashboard-chart-card" title="当前处理状态分布" :loading="dashboardLoading">
-            <div ref="statusChartRef" class="dashboard-chart"></div>
+            <div class="dashboard-bars">
+              <div v-for="item in statusRows" :key="item.name" class="dashboard-bar-row">
+                <div class="bar-row-head">
+                  <span>{{ item.name }}</span>
+                  <strong>{{ item.value }}单</strong>
+                </div>
+                <div class="bar-track">
+                  <i :style="{ width: `${item.percent}%`, background: item.color }"></i>
+                </div>
+              </div>
+              <div v-if="!statusRows.length" class="dashboard-empty">暂无数据</div>
+            </div>
           </Card>
         </Col>
         <Col :span="14">
           <Card class="dashboard-chart-card" title="员工处理排行" :loading="dashboardLoading">
-            <div ref="assigneeChartRef" class="dashboard-chart"></div>
+            <div class="dashboard-bars assignee-bars">
+              <div v-for="item in assigneeRows" :key="item.name" class="dashboard-bar-row">
+                <div class="bar-row-head">
+                  <span>{{ item.name }}</span>
+                  <strong>回款 {{ item.paid }} / 领取 {{ item.claimed }}</strong>
+                </div>
+                <div class="multi-bar">
+                  <i class="green" :style="{ width: `${item.paidPercent}%` }"></i>
+                  <i class="blue" :style="{ width: `${item.claimedPercent}%` }"></i>
+                  <i class="amber" :style="{ width: `${item.activePercent}%` }"></i>
+                </div>
+              </div>
+              <div class="chart-legend compact">
+                <span><i class="legend-dot green"></i>已回款</span>
+                <span><i class="legend-dot blue"></i>领取量</span>
+                <span><i class="legend-dot amber"></i>处理中</span>
+              </div>
+              <div v-if="!assigneeRows.length" class="dashboard-empty">暂无员工处理数据</div>
+            </div>
           </Card>
         </Col>
       </Row>

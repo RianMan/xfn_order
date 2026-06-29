@@ -8,7 +8,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           vue: ["vue"],
-          echarts: ["echarts"],
           antd: ["ant-design-vue", "@ant-design/icons-vue"]
         }
       }
