@@ -1,6 +1,5 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
-import * as echarts from "echarts";
 import {
   Button,
   Card,
@@ -47,6 +46,7 @@ const trendChartRef = ref(null);
 const statusChartRef = ref(null);
 const assigneeChartRef = ref(null);
 const chartInstances = [];
+let echartsApi;
 const filters = reactive({
   keyword: "",
   processStatus: undefined,
@@ -256,10 +256,16 @@ function resizeCharts() {
   for (const chart of chartInstances) chart.resize();
 }
 
-function renderDashboardCharts() {
+async function loadEcharts() {
+  if (!echartsApi) echartsApi = await import("echarts");
+  return echartsApi;
+}
+
+async function renderDashboardCharts() {
   disposeCharts();
   const data = dashboardData.value;
   if (!data) return;
+  const echarts = await loadEcharts();
 
   const dates = data.trend.map((item) => item.date.slice(5));
   mountChart(trendChartRef.value, {
