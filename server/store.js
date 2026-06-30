@@ -61,6 +61,7 @@ function normalizeOrder(order) {
     commissionAmount: DEFAULT_COMMISSION_AMOUNT,
     wageStatus: WAGE_PENDING,
     completedAt: "",
+    paymentScreenshotUpdatedAt: "",
     difficultyLevel: 0,
     paymentScreenshots: [],
     otherScreenshots: order.screenshots ?? [],
@@ -76,6 +77,7 @@ function normalizeOrder(order) {
     difficultyLevel: Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0,
     wageStatus: order.wageStatus ?? WAGE_PENDING,
     completedAt: order.completedAt ?? "",
+    paymentScreenshotUpdatedAt: order.paymentScreenshotUpdatedAt ?? "",
     status: order.status ?? "pending"
   };
 }
@@ -216,6 +218,13 @@ function markPaidIfNeeded(order, patch) {
     : DEFAULT_COMMISSION_AMOUNT;
 }
 
+function sameStringArray(left, right) {
+  const leftItems = Array.isArray(left) ? left : [];
+  const rightItems = Array.isArray(right) ? right : [];
+  if (leftItems.length !== rightItems.length) return false;
+  return leftItems.every((item, index) => item === rightItems[index]);
+}
+
 export async function readDashboardMetrics(days = 14) {
   const orders = await readOrders();
   const dates = dayRange(days);
@@ -302,6 +311,7 @@ export async function updateOrder(id, patch) {
   const orders = await readOrders();
   const order = orders.find((item) => item.id === id);
   if (!order) return null;
+  const oldPaymentScreenshots = [...(order.paymentScreenshots || [])];
 
   const allowedFields = [
     "returnReason",
@@ -342,6 +352,9 @@ export async function updateOrder(id, patch) {
   }
   if ("commissionAmount" in patch) {
     order.commissionAmount = Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT;
+  }
+  if ("paymentScreenshots" in patch && !sameStringArray(oldPaymentScreenshots, order.paymentScreenshots)) {
+    order.paymentScreenshotUpdatedAt = new Date().toISOString();
   }
   markPaidIfNeeded(order, patch);
 
@@ -436,6 +449,7 @@ export async function updateStaffOrder(id, staff, patch) {
   const order = orders.find((item) => item.id === id && item.assigneeAccount === staff.account);
   if (!order) return null;
   if (order.status === "completed") return null;
+  const oldPaymentScreenshots = [...(order.paymentScreenshots || [])];
 
   if (patch?.unable === true) {
     return markStaffOrderUnableByOrder(order, orders, staff);
@@ -450,6 +464,9 @@ export async function updateStaffOrder(id, staff, patch) {
     if (field in patch) order[field] = patch[field];
   }
 
+  if ("paymentScreenshots" in patch && !sameStringArray(oldPaymentScreenshots, order.paymentScreenshots)) {
+    order.paymentScreenshotUpdatedAt = new Date().toISOString();
+  }
   markPaidIfNeeded(order, patch);
   appendStaffRemark(order, staff, patch.remarkAppend);
   order.handler = staff.name;

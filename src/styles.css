@@ -213,6 +213,10 @@ body {
   width: 100%;
 }
 
+.trend-hot-zone {
+  cursor: crosshair;
+}
+
 .dashboard-bars {
   display: grid;
   gap: 14px;
@@ -352,6 +356,19 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.shot-cell {
+  display: grid;
+  gap: 6px;
+}
+
+.time-line {
+  color: #64748b;
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
 }
 
 .inline-shots a,

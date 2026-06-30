@@ -42,12 +42,15 @@ const dashboardLoading = ref(false);
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
 const dashboardData = ref(null);
+const activeTrendIndex = ref(null);
 const filters = reactive({
   keyword: "",
   processStatus: undefined,
   assigneeAccount: undefined,
   difficulty: undefined,
-  returnAddress: undefined
+  returnAddress: undefined,
+  paymentScreenshotStart: "",
+  paymentScreenshotEnd: ""
 });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
@@ -144,6 +147,18 @@ const stats = computed(() => ({
   paid: orders.value.filter((item) => item.processStatus === "已回款").length
 }));
 
+function dateOnly(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
 const filteredOrders = computed(() => {
   const keyword = filters.keyword.trim();
   return orders.value.filter((order) => {
@@ -157,12 +172,19 @@ const filteredOrders = computed(() => {
       !filters.difficulty ||
       (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
     const returnAddressOk = !filters.returnAddress || order.returnAddress === filters.returnAddress;
+    const paymentScreenshotDate = dateOnly(order.paymentScreenshotUpdatedAt);
+    const hasPaymentScreenshotDateFilter = Boolean(filters.paymentScreenshotStart || filters.paymentScreenshotEnd);
+    const paymentScreenshotDateOk =
+      !hasPaymentScreenshotDateFilter ||
+      Boolean(paymentScreenshotDate) &&
+        (!filters.paymentScreenshotStart || paymentScreenshotDate >= filters.paymentScreenshotStart) &&
+        (!filters.paymentScreenshotEnd || paymentScreenshotDate <= filters.paymentScreenshotEnd);
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && difficultyOk && returnAddressOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && returnAddressOk && paymentScreenshotDateOk && keywordOk;
   });
 });
 
@@ -208,29 +230,39 @@ const staffColumns = [
   { title: "操作", key: "action", width: 120 }
 ];
 
+function niceMax(value) {
+  const raw = Math.max(1, Number(value || 0));
+  const power = 10 ** Math.floor(Math.log10(raw));
+  const scaled = raw / power;
+  const nice = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
+  return nice * power;
+}
+
 const trendChart = computed(() => {
   const trend = dashboardData.value?.trend || [];
   const width = 920;
   const height = 300;
-  const pad = { top: 28, right: 18, bottom: 36, left: 34 };
+  const pad = { top: 28, right: 58, bottom: 36, left: 46 };
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
-  const maxValue = Math.max(
+  const countMax = niceMax(Math.max(
     1,
     ...trend.flatMap((item) => [
       Number(item.newOrders || 0),
       Number(item.claimedOrders || 0),
-      Number(item.paidOrders || 0),
-      Number(item.paymentAmount || 0)
+      Number(item.paidOrders || 0)
     ])
-  );
+  ));
+  const amountMax = niceMax(Math.max(1, ...trend.map((item) => Number(item.paymentAmount || 0))));
   const x = (index) => pad.left + (trend.length <= 1 ? 0 : (plotWidth * index) / (trend.length - 1));
-  const y = (value) => pad.top + plotHeight - (plotHeight * Number(value || 0)) / maxValue;
-  const points = (field) => trend.map((item, index) => `${x(index)},${y(item[field])}`).join(" ");
+  const yCount = (value) => pad.top + plotHeight - (plotHeight * Number(value || 0)) / countMax;
+  const yAmount = (value) => pad.top + plotHeight - (plotHeight * Number(value || 0)) / amountMax;
+  const countPoints = (field) => trend.map((item, index) => `${x(index)},${yCount(item[field])}`).join(" ");
+  const amountPoints = (field) => trend.map((item, index) => `${x(index)},${yAmount(item[field])}`).join(" ");
   const bars = trend.map((item, index) => {
     const cx = x(index);
     const barWidth = Math.max(8, Math.min(24, plotWidth / Math.max(trend.length, 1) - 10));
-    const barY = y(item.paidOrders);
+    const barY = yCount(item.paidOrders);
     return {
       x: cx - barWidth / 2,
       y: barY,
@@ -239,6 +271,25 @@ const trendChart = computed(() => {
       label: item.date.slice(5)
     };
   });
+  const points = trend.map((item, index) => ({
+    index,
+    x: x(index),
+    date: item.date,
+    label: item.date.slice(5),
+    newOrders: Number(item.newOrders || 0),
+    claimedOrders: Number(item.claimedOrders || 0),
+    paidOrders: Number(item.paidOrders || 0),
+    paymentAmount: Number(item.paymentAmount || 0),
+    newY: yCount(item.newOrders),
+    claimedY: yCount(item.claimedOrders),
+    paidY: yCount(item.paidOrders),
+    amountY: yAmount(item.paymentAmount)
+  }));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => ({
+    y: pad.top + plotHeight - plotHeight * ratio,
+    count: Math.round(countMax * ratio),
+    amount: Math.round(amountMax * ratio)
+  }));
 
   return {
     width,
@@ -246,17 +297,36 @@ const trendChart = computed(() => {
     pad,
     plotWidth,
     plotHeight,
-    maxValue,
+    countMax,
+    amountMax,
+    ticks,
+    points,
     labels: trend.map((item, index) => ({
       x: x(index),
       text: item.date.slice(5),
       show: index === 0 || index === trend.length - 1 || index % 3 === 0
     })),
     bars,
-    newLine: points("newOrders"),
-    claimedLine: points("claimedOrders"),
-    amountLine: points("paymentAmount")
+    newLine: countPoints("newOrders"),
+    claimedLine: countPoints("claimedOrders"),
+    amountLine: amountPoints("paymentAmount")
   };
+});
+
+const activeTrendPoint = computed(() => {
+  const points = trendChart.value.points || [];
+  if (activeTrendIndex.value === null) return null;
+  const index = activeTrendIndex.value;
+  const point = points[index];
+  if (!point) return null;
+  const tooltipWidth = 176;
+  const tooltipHeight = 96;
+  const x = Math.min(
+    trendChart.value.width - trendChart.value.pad.right - tooltipWidth,
+    Math.max(trendChart.value.pad.left + 8, point.x + 12)
+  );
+  const y = Math.max(trendChart.value.pad.top + 6, Math.min(point.newY, point.claimedY, point.amountY) - 104);
+  return { ...point, tooltipX: x, tooltipY: y, tooltipWidth, tooltipHeight };
 });
 
 const statusRows = computed(() => {
@@ -288,7 +358,8 @@ async function doLogin() {
     });
     localStorage.setItem("adminToken", data.token);
     loggedIn.value = true;
-    await loadDashboard();
+    if (activeTab.value === "dashboard") await loadDashboard();
+    else await loadOrders();
     antMessage.success("登录成功");
   } catch (err) {
     antMessage.error(err.message);
@@ -498,7 +569,8 @@ async function saveOrder(record) {
         paymentScreenshots: record.paymentScreenshots || [],
         otherScreenshots: record.otherScreenshots || [],
         commissionAmount: record.commissionAmount,
-        wageStatus: record.wageStatus
+        wageStatus: record.wageStatus,
+        completedAt: record.completedAt || ""
       })
     });
 
@@ -605,6 +677,8 @@ function resetFilters() {
   filters.assigneeAccount = undefined;
   filters.difficulty = undefined;
   filters.returnAddress = undefined;
+  filters.paymentScreenshotStart = "";
+  filters.paymentScreenshotEnd = "";
   pager.current = 1;
 }
 
@@ -714,7 +788,18 @@ if (activeTab.value === "dashboard") loadDashboard();
             <span><i class="legend-dot green"></i>已回款</span>
             <span><i class="legend-dot amber"></i>回款金额</span>
           </div>
-          <svg class="trend-svg" :viewBox="`0 0 ${trendChart.width} ${trendChart.height}`" role="img">
+          <svg class="trend-svg" :viewBox="`0 0 ${trendChart.width} ${trendChart.height}`" role="img" @mouseleave="activeTrendIndex = null">
+            <g v-for="tick in trendChart.ticks" :key="tick.y">
+              <line
+                :x1="trendChart.pad.left"
+                :y1="tick.y"
+                :x2="trendChart.pad.left + trendChart.plotWidth"
+                :y2="tick.y"
+                stroke="#edf2f7"
+              />
+              <text :x="trendChart.pad.left - 8" :y="tick.y + 4" text-anchor="end" fill="#94a3b8" font-size="11">{{ tick.count }}</text>
+              <text :x="trendChart.pad.left + trendChart.plotWidth + 8" :y="tick.y + 4" fill="#94a3b8" font-size="11">¥{{ tick.amount }}</text>
+            </g>
             <line
               :x1="trendChart.pad.left"
               :y1="trendChart.pad.top + trendChart.plotHeight"
@@ -729,7 +814,8 @@ if (activeTab.value === "dashboard") loadDashboard();
               :y2="trendChart.pad.top + trendChart.plotHeight"
               stroke="#e2e8f0"
             />
-            <text :x="trendChart.pad.left" :y="18" fill="#94a3b8" font-size="12">峰值 {{ trendChart.maxValue }}</text>
+            <text :x="trendChart.pad.left" :y="18" fill="#94a3b8" font-size="12">订单数</text>
+            <text :x="trendChart.pad.left + trendChart.plotWidth" :y="18" fill="#94a3b8" font-size="12" text-anchor="end">回款金额</text>
             <rect
               v-for="(bar, index) in trendChart.bars"
               :key="`paid-${index}`"
@@ -744,9 +830,53 @@ if (activeTab.value === "dashboard") loadDashboard();
             <polyline :points="trendChart.newLine" fill="none" stroke="#1677ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
             <polyline :points="trendChart.claimedLine" fill="none" stroke="#13c2c2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
             <polyline :points="trendChart.amountLine" fill="none" stroke="#faad14" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <g v-for="point in trendChart.points" :key="`point-${point.index}`">
+              <circle :cx="point.x" :cy="point.newY" r="4" fill="#1677ff" stroke="#fff" stroke-width="2" />
+              <circle :cx="point.x" :cy="point.claimedY" r="4" fill="#13c2c2" stroke="#fff" stroke-width="2" />
+              <circle :cx="point.x" :cy="point.amountY" r="4" fill="#faad14" stroke="#fff" stroke-width="2" />
+            </g>
             <g v-for="label in trendChart.labels" :key="label.text">
               <text v-if="label.show" :x="label.x" :y="trendChart.height - 10" text-anchor="middle" fill="#64748b" font-size="11">{{ label.text }}</text>
             </g>
+            <g v-if="activeTrendPoint">
+              <line
+                :x1="activeTrendPoint.x"
+                :y1="trendChart.pad.top"
+                :x2="activeTrendPoint.x"
+                :y2="trendChart.pad.top + trendChart.plotHeight"
+                stroke="#94a3b8"
+                stroke-dasharray="4 4"
+              />
+              <circle :cx="activeTrendPoint.x" :cy="activeTrendPoint.newY" r="6" fill="#1677ff" stroke="#fff" stroke-width="2" />
+              <circle :cx="activeTrendPoint.x" :cy="activeTrendPoint.claimedY" r="6" fill="#13c2c2" stroke="#fff" stroke-width="2" />
+              <circle :cx="activeTrendPoint.x" :cy="activeTrendPoint.amountY" r="6" fill="#faad14" stroke="#fff" stroke-width="2" />
+              <rect
+                :x="activeTrendPoint.tooltipX"
+                :y="activeTrendPoint.tooltipY"
+                :width="activeTrendPoint.tooltipWidth"
+                :height="activeTrendPoint.tooltipHeight"
+                rx="8"
+                fill="#0f172a"
+                opacity="0.92"
+              />
+              <text :x="activeTrendPoint.tooltipX + 12" :y="activeTrendPoint.tooltipY + 22" fill="#fff" font-size="13" font-weight="700">{{ activeTrendPoint.date }}</text>
+              <text :x="activeTrendPoint.tooltipX + 12" :y="activeTrendPoint.tooltipY + 42" fill="#bfdbfe" font-size="12">新增订单：{{ activeTrendPoint.newOrders }} 单</text>
+              <text :x="activeTrendPoint.tooltipX + 12" :y="activeTrendPoint.tooltipY + 60" fill="#99f6e4" font-size="12">领取处理：{{ activeTrendPoint.claimedOrders }} 单</text>
+              <text :x="activeTrendPoint.tooltipX + 12" :y="activeTrendPoint.tooltipY + 78" fill="#bbf7d0" font-size="12">已回款：{{ activeTrendPoint.paidOrders }} 单</text>
+              <text :x="activeTrendPoint.tooltipX + 12" :y="activeTrendPoint.tooltipY + 94" fill="#fde68a" font-size="12">回款金额：¥{{ formatMoney(activeTrendPoint.paymentAmount) }}</text>
+            </g>
+            <rect
+              v-for="point in trendChart.points"
+              :key="`hot-${point.index}`"
+              :x="point.x - Math.max(14, trendChart.plotWidth / Math.max(trendChart.points.length, 1) / 2)"
+              :y="trendChart.pad.top"
+              :width="Math.max(28, trendChart.plotWidth / Math.max(trendChart.points.length, 1))"
+              :height="trendChart.plotHeight"
+              fill="transparent"
+              class="trend-hot-zone"
+              @mouseenter="activeTrendIndex = point.index"
+              @mousemove="activeTrendIndex = point.index"
+            />
           </svg>
         </div>
       </Card>
@@ -871,6 +1001,20 @@ if (activeTab.value === "dashboard") loadDashboard();
             >
               <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
             </Select>
+            <Input
+              v-model:value="filters.paymentScreenshotStart"
+              type="date"
+              title="收款截图开始日期"
+              style="width: 150px"
+              @change="pager.current = 1"
+            />
+            <Input
+              v-model:value="filters.paymentScreenshotEnd"
+              type="date"
+              title="收款截图结束日期"
+              style="width: 150px"
+              @change="pager.current = 1"
+            />
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
@@ -884,7 +1028,7 @@ if (activeTab.value === "dashboard") loadDashboard();
           row-key="id"
           size="middle"
           bordered
-          :scroll="{ x: 2040 }"
+          :scroll="{ x: 2160 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'order'">
@@ -964,14 +1108,17 @@ if (activeTab.value === "dashboard") loadDashboard();
             </template>
 
             <template v-else-if="column.key === 'paymentScreenshots'">
-              <div class="inline-shots">
-                <div v-for="url in record.paymentScreenshots" :key="url" class="shot-thumb">
-                  <Image :src="url" :width="52" :height="52" />
-                  <button @click="removeScreenshot(record, 'paymentScreenshots', url)">移除</button>
+              <div class="shot-cell">
+                <div class="inline-shots">
+                  <div v-for="url in record.paymentScreenshots" :key="url" class="shot-thumb">
+                    <Image :src="url" :width="52" :height="52" />
+                    <button @click="removeScreenshot(record, 'paymentScreenshots', url)">移除</button>
+                  </div>
+                  <Upload :before-upload="file => uploadScreenshot(record, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
+                    <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
+                  </Upload>
                 </div>
-                <Upload :before-upload="file => uploadScreenshot(record, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
-                  <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
-                </Upload>
+                <span class="time-line">截图时间：{{ formatDiscussionTime(record.paymentScreenshotUpdatedAt) || "-" }}</span>
               </div>
             </template>
 
@@ -1019,6 +1166,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                 <Button type="primary" size="small" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</Button>
                 <Button v-if="activeTab !== 'history'" size="small" @click="openAnnotateModal(record)">标注</Button>
                 <Button v-if="activeTab !== 'history'" danger size="small" @click="completeUpstream(record)">已完结</Button>
+                <span class="time-line">完结：{{ formatDiscussionTime(record.completedAt) || "-" }}</span>
               </Space>
             </template>
           </template>
