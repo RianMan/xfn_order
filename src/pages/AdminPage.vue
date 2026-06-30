@@ -23,9 +23,13 @@ import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SY
 
 const { TextArea } = Input;
 const WAGE_OPTIONS = ["待发放", "已发放"];
+const ROLE_OPTIONS = [
+  { value: "operator", label: "操作员" },
+  { value: "admin", label: "admin" }
+];
 
-const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
-const staffForm = reactive({ account: "", name: "", password: "" });
+const login = reactive({ username: "", password: "" });
+const staffForm = reactive({ account: "", name: "", password: "", role: "operator" });
 const importParams = reactive({
   p: "1",
   fenyei: "10",
@@ -67,7 +71,8 @@ const staffEditModal = reactive({
   id: "",
   account: "",
   name: "",
-  password: ""
+  password: "",
+  role: "operator"
 });
 
 function authHeaders() {
@@ -135,8 +140,8 @@ const pageMeta = computed(() => {
     };
   }
   return {
-    title: "员工管理",
-    subtitle: "添加员工账号，供移动端领取工单使用"
+    title: "账号管理",
+    subtitle: "配置员工账号和后台访问权限"
   };
 });
 
@@ -224,6 +229,7 @@ const columns = computed(() => {
 const staffColumns = [
   { title: "账号", dataIndex: "account", key: "account" },
   { title: "姓名", dataIndex: "name", key: "name" },
+  { title: "权限", key: "role" },
   { title: "创建时间", dataIndex: "createdAt", key: "createdAt" },
   { title: "操作", key: "action", width: 120 }
 ];
@@ -381,9 +387,18 @@ function payrollStatus(value) {
   return value || "待发放";
 }
 
+function roleLabel(role) {
+  return ROLE_OPTIONS.find((item) => item.value === role)?.label || "操作员";
+}
+
 function csvCell(value) {
   const text = String(value ?? "");
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function numberValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function exportPendingPayroll() {
@@ -393,19 +408,46 @@ function exportPendingPayroll() {
     return;
   }
 
-  const headers = ["处理人", "员工账号", "订单号", "完结时间", "回收金额", "售后佣金", "回收人", "佣金", "薪资状态"];
+  const summaryMap = new Map();
+  for (const order of rows) {
+    const account = order.assigneeAccount || "未分配账号";
+    const item = summaryMap.get(account) || {
+      account,
+      name: order.assigneeName || order.handler || "",
+      orderCount: 0,
+      recoveryAmount: 0,
+      afterSalesCommissionAmount: 0,
+      commissionAmount: 0,
+      recyclers: new Set(),
+      orderNumbers: [],
+      completedDates: []
+    };
+
+    item.name = item.name || order.assigneeName || order.handler || "";
+    item.orderCount += 1;
+    item.recoveryAmount += numberValue(order.recoveryAmount);
+    item.afterSalesCommissionAmount += numberValue(order.afterSalesCommissionAmount);
+    item.commissionAmount += numberValue(order.commissionAmount);
+    if (order.recycler) item.recyclers.add(order.recycler);
+    if (order.orderNumber) item.orderNumbers.push(order.orderNumber);
+    if (order.completedAt) item.completedDates.push(dateOnly(order.completedAt));
+    summaryMap.set(account, item);
+  }
+
+  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.account.localeCompare(b.account));
+  const headers = ["员工账号", "员工姓名", "待发放订单数", "回收金额合计", "售后佣金合计", "后台佣金合计", "回收人", "订单号列表", "完结日期"];
   const lines = [
     headers.map(csvCell).join(","),
-    ...rows.map((order) => [
-      order.assigneeName || order.handler || "",
-      order.assigneeAccount || "",
-      order.orderNumber || "",
-      formatDiscussionTime(order.completedAt) || "",
-      order.recoveryAmount ?? "",
-      order.afterSalesCommissionAmount ?? "",
-      order.recycler || "",
-      order.commissionAmount ?? "",
-      payrollStatus(order.wageStatus)
+    ...summaryRows.map((item) => [
+      item.account,
+      item.name,
+      item.orderCount,
+      formatMoney(item.recoveryAmount),
+      formatMoney(item.afterSalesCommissionAmount),
+      formatMoney(item.commissionAmount),
+      Array.from(item.recyclers).join(" / "),
+      item.orderNumbers.join(" / "),
+      Array.from(new Set(item.completedDates)).join(" / ")
     ].map(csvCell).join(","))
   ];
   const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
@@ -474,6 +516,7 @@ async function createStaffAccount() {
     staffForm.account = "";
     staffForm.name = "";
     staffForm.password = "";
+    staffForm.role = "operator";
     antMessage.success("员工已添加");
     await loadStaffList();
   } catch (err) {
@@ -485,6 +528,7 @@ function openStaffEditModal(record) {
   staffEditModal.id = record.id;
   staffEditModal.account = record.account;
   staffEditModal.name = record.name;
+  staffEditModal.role = record.role || "operator";
   staffEditModal.password = "";
   staffEditModal.open = true;
 }
@@ -498,6 +542,7 @@ async function submitStaffEdit() {
       body: JSON.stringify({
         account: staffEditModal.account,
         name: staffEditModal.name,
+        role: staffEditModal.role,
         password: staffEditModal.password
       })
     });
@@ -760,7 +805,7 @@ if (activeTab.value === "dashboard") loadDashboard();
         <button :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">订单台账</button>
         <button :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
         <button :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史订单</button>
-        <button :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">员工管理</button>
+        <button :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号管理</button>
       </nav>
       <Space>
         <Button :loading="activeTab === 'dashboard' ? dashboardLoading : tableLoading" @click="activeTab === 'dashboard' ? loadDashboard() : loadOrders()">刷新</Button>
@@ -1252,18 +1297,28 @@ if (activeTab.value === "dashboard") loadDashboard();
     </section>
 
     <section v-else class="admin-content">
-      <Card title="添加员工" class="admin-staff-form">
+      <Card title="添加账号" class="admin-staff-form">
         <Row :gutter="12" align="bottom">
-          <Col :span="6"><Form.Item label="账号"><Input v-model:value="staffForm.account" placeholder="登录账号" /></Form.Item></Col>
-          <Col :span="6"><Form.Item label="姓名"><Input v-model:value="staffForm.name" placeholder="员工姓名" /></Form.Item></Col>
-          <Col :span="6"><Form.Item label="密码"><Input.Password v-model:value="staffForm.password" placeholder="登录密码" /></Form.Item></Col>
-          <Col :span="6"><Button type="primary" block @click="createStaffAccount">添加员工</Button></Col>
+          <Col :span="5"><Form.Item label="账号"><Input v-model:value="staffForm.account" placeholder="登录账号" /></Form.Item></Col>
+          <Col :span="5"><Form.Item label="姓名"><Input v-model:value="staffForm.name" placeholder="员工姓名" /></Form.Item></Col>
+          <Col :span="5"><Form.Item label="密码"><Input.Password v-model:value="staffForm.password" placeholder="登录密码" /></Form.Item></Col>
+          <Col :span="5">
+            <Form.Item label="权限">
+              <Select v-model:value="staffForm.role">
+                <Select.Option v-for="item in ROLE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col :span="4"><Button type="primary" block @click="createStaffAccount">添加账号</Button></Col>
         </Row>
       </Card>
 
-      <Card class="table-card" title="员工列表">
+      <Card class="table-card" title="账号列表">
         <Table class="desktop-admin-table" :columns="staffColumns" :data-source="staffList" row-key="id" :pagination="{ pageSize: 10 }" bordered>
           <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'role'">
+              <Tag :color="record.role === 'admin' ? 'blue' : 'default'">{{ roleLabel(record.role) }}</Tag>
+            </template>
             <template v-if="column.key === 'action'">
               <Button size="small" @click="openStaffEditModal(record)">编辑</Button>
             </template>
@@ -1284,6 +1339,9 @@ if (activeTab.value === "dashboard") loadDashboard();
     <Space direction="vertical" style="width: 100%">
       <Input v-model:value="staffEditModal.account" placeholder="登录账号" />
       <Input v-model:value="staffEditModal.name" placeholder="员工姓名" />
+      <Select v-model:value="staffEditModal.role" placeholder="选择权限">
+        <Select.Option v-for="item in ROLE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</Select.Option>
+      </Select>
       <Input.Password v-model:value="staffEditModal.password" placeholder="新密码，留空则不修改" />
     </Space>
   </Modal>

@@ -24,7 +24,7 @@ import {
   updateOrder,
   updateStaffOrder
 } from "./store.js";
-import { createStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
+import { createStaff, hasAdminStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
 import { syncUpstreamOrders } from "./sync.js";
 import { annotateUpstreamOrder, completeUpstreamOrder } from "./upstream.js";
 
@@ -48,7 +48,7 @@ function loadSessions() {
   try {
     const raw = JSON.parse(readFileSync(sessionPath, "utf8"));
     return {
-      sessions: new Set(raw.admin ?? []),
+      sessions: new Map(raw.admin && !Array.isArray(raw.admin) ? Object.entries(raw.admin) : []),
       staffSessions: new Map(Object.entries(raw.staff ?? {}))
     };
   } catch {
@@ -62,7 +62,7 @@ function loadSessions() {
 function persistSessions() {
   mkdirSync(path.dirname(sessionPath), { recursive: true });
   writeFileSync(sessionPath, JSON.stringify({
-    admin: Array.from(sessions),
+    admin: Object.fromEntries(sessions),
     staff: Object.fromEntries(staffSessions)
   }, null, 2));
 }
@@ -102,10 +102,12 @@ function getToken(req) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!sessions.has(getToken(req))) {
+  const admin = sessions.get(getToken(req));
+  if (!admin || admin.role !== "admin") {
     res.status(401).json({ message: "请先登录" });
     return;
   }
+  req.admin = admin;
   next();
 }
 
@@ -146,17 +148,26 @@ async function handleImageUpload(req, res, folder) {
   }
 }
 
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body ?? {};
-  if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
+  const staff = await verifyStaff(username, password);
+  const canBootstrap = !await hasAdminStaff() && username === ADMIN_USER && password === ADMIN_PASSWORD;
+  if (!staff && !canBootstrap) {
     res.status(401).json({ message: "账号或密码错误" });
+    return;
+  }
+  if (staff && staff.role !== "admin") {
+    res.status(403).json({ message: "该账号没有后台管理权限" });
     return;
   }
 
   const token = crypto.randomUUID();
-  sessions.add(token);
+  const admin = staff
+    ? { id: staff.id, account: staff.account, name: staff.name, role: staff.role }
+    : { id: "bootstrap-admin", account: username, name: "临时管理员", role: "admin" };
+  sessions.set(token, admin);
   persistSessions();
-  res.json({ token, username });
+  res.json({ token, user: admin, username: admin.account });
 });
 
 app.get("/api/admin/orders", requireAdmin, async (req, res) => {
@@ -308,7 +319,7 @@ app.post("/api/staff/login", async (req, res) => {
   }
 
   const token = crypto.randomUUID();
-  const safeStaff = { id: staff.id, account: staff.account, name: staff.name };
+  const safeStaff = { id: staff.id, account: staff.account, name: staff.name, role: staff.role };
   staffSessions.set(token, safeStaff);
   persistSessions();
   res.json({ token, staff: safeStaff });

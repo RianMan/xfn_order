@@ -3,8 +3,12 @@ import { computed, reactive, ref } from "vue";
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
 const WAGE_OPTIONS = ["待发放", "已发放"];
-const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
-const staffForm = reactive({ account: "", name: "", password: "" });
+const ROLE_OPTIONS = [
+  { value: "operator", label: "操作员" },
+  { value: "admin", label: "admin" }
+];
+const login = reactive({ username: "", password: "" });
+const staffForm = reactive({ account: "", name: "", password: "", role: "operator" });
 const importParams = reactive({
   p: "1",
   fenyei: "10",
@@ -27,7 +31,7 @@ const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
 const discussionDrafts = reactive({});
 const editingStaffId = ref("");
-const staffEditForm = reactive({ account: "", name: "", password: "" });
+const staffEditForm = reactive({ account: "", name: "", password: "", role: "operator" });
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -190,6 +194,7 @@ async function createStaffAccount() {
     staffForm.account = "";
     staffForm.name = "";
     staffForm.password = "";
+    staffForm.role = "operator";
     showNotice("员工已添加");
     await loadStaffList();
   } catch (err) {
@@ -201,6 +206,7 @@ function startEditStaff(item) {
   editingStaffId.value = item.id;
   staffEditForm.account = item.account;
   staffEditForm.name = item.name;
+  staffEditForm.role = item.role || "operator";
   staffEditForm.password = "";
 }
 
@@ -209,6 +215,7 @@ function cancelEditStaff() {
   staffEditForm.account = "";
   staffEditForm.name = "";
   staffEditForm.password = "";
+  staffEditForm.role = "operator";
 }
 
 async function saveStaffEdit(item) {
@@ -486,7 +493,7 @@ loadOrders();
     <header class="mobile-admin-header">
       <div>
         <strong>售后后台</strong>
-        <span>{{ activeTab === "orders" ? "订单补充和上游处理" : activeTab === "sync" ? "同步三方订单" : "员工账号管理" }}</span>
+        <span>{{ activeTab === "orders" ? "订单补充和上游处理" : activeTab === "sync" ? "同步三方订单" : "账号权限管理" }}</span>
       </div>
       <button type="button" @click="logout">退出</button>
     </header>
@@ -495,7 +502,7 @@ loadOrders();
       <button type="button" :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">工单</button>
       <button type="button" :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史</button>
       <button type="button" :class="{ active: activeTab === 'sync' }" @click="switchTab('sync')">同步</button>
-      <button type="button" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">员工</button>
+      <button type="button" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号</button>
     </nav>
 
     <section v-if="activeTab === 'orders' || activeTab === 'history'" class="mobile-admin-content">
@@ -713,11 +720,16 @@ loadOrders();
 
     <section v-else class="mobile-admin-content">
       <div class="mobile-admin-panel">
-        <h2>添加员工</h2>
+        <h2>添加账号</h2>
         <label>账号<input v-model="staffForm.account" placeholder="登录账号" /></label>
         <label>姓名<input v-model="staffForm.name" placeholder="员工姓名" /></label>
         <label>密码<input v-model="staffForm.password" type="password" placeholder="登录密码" /></label>
-        <button type="button" class="mobile-admin-primary" @click="createStaffAccount">添加员工</button>
+        <label>权限
+          <select v-model="staffForm.role">
+            <option v-for="role in ROLE_OPTIONS" :key="role.value" :value="role.value">{{ role.label }}</option>
+          </select>
+        </label>
+        <button type="button" class="mobile-admin-primary" @click="createStaffAccount">添加账号</button>
       </div>
 
       <div class="mobile-admin-staff-list">
@@ -725,6 +737,11 @@ loadOrders();
           <template v-if="editingStaffId === item.id">
             <label>账号<input v-model="staffEditForm.account" placeholder="登录账号" /></label>
             <label>姓名<input v-model="staffEditForm.name" placeholder="员工姓名" /></label>
+            <label>权限
+              <select v-model="staffEditForm.role">
+                <option v-for="role in ROLE_OPTIONS" :key="role.value" :value="role.value">{{ role.label }}</option>
+              </select>
+            </label>
             <label>新密码<input v-model="staffEditForm.password" type="password" placeholder="留空则不修改" /></label>
             <div class="m-admin-action-bar">
               <button type="button" class="primary" @click="saveStaffEdit(item)">保存</button>
@@ -734,6 +751,7 @@ loadOrders();
           <template v-else>
             <strong>{{ item.name }}</strong>
             <span>账号：{{ item.account }}</span>
+            <span>权限：{{ item.role === "admin" ? "admin" : "操作员" }}</span>
             <span>创建时间：{{ item.createdAt }}</span>
             <button type="button" @click="startEditStaff(item)">编辑</button>
           </template>
