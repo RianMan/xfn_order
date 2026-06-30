@@ -213,9 +213,41 @@ function closeStatusSheet() {
   statusSheet.closing = false;
 }
 
-function selectProcessStatus(value) {
+async function selectProcessStatus(value) {
   if (statusSheet.closing) return;
-  if (statusSheet.order) statusSheet.order.processStatus = value;
+  const order = statusSheet.order;
+  if (!order || order.processStatus === value) {
+    closeStatusSheet();
+    return;
+  }
+
+  const previous = order.processStatus;
+  order.processStatus = value;
+  if (!validateStaffOrderBeforeSave(order)) {
+    order.processStatus = previous;
+    return;
+  }
+
+  try {
+    const data = await staffRequest(`/api/staff/orders/${order.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        processStatus: value,
+        paymentScreenshots: order.paymentScreenshots || [],
+        recoveryAmount: order.recoveryAmount,
+        afterSalesCommissionAmount: order.afterSalesCommissionAmount,
+        recycler: order.recycler || ""
+      })
+    });
+    const index = staffOrders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) staffOrders.value[index] = data.order;
+    showToast("状态已保存");
+  } catch (err) {
+    order.processStatus = previous;
+    showToast(err.message || "状态保存失败", "error");
+    return;
+  }
+
   statusSheet.closing = true;
   window.clearTimeout(statusSheet.closeTimer);
   statusSheet.closeTimer = window.setTimeout(() => {

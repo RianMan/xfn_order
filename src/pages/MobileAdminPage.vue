@@ -293,6 +293,26 @@ async function saveOrder(record) {
   }
 }
 
+async function updateProcessStatus(record, value) {
+  if (!record || record.processStatus === value) return;
+  const previous = record.processStatus;
+  record.processStatus = value;
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ processStatus: value })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    showNotice("状态已保存");
+    await loadOrders();
+  } catch (err) {
+    record.processStatus = previous;
+    showNotice(err.message || "状态保存失败");
+  }
+}
+
 async function restoreToLedger(record) {
   if (!record) return;
   if (!window.confirm(`确认把订单 ${record.orderNumber} 移回订单台账吗？处理状态会重置为未处理。`)) return;
@@ -634,7 +654,7 @@ loadOrders();
               <strong>处理进度</strong>
               <div class="m-admin-two-col">
                 <label>状态
-                  <select v-model="record.processStatus">
+                  <select :value="record.processStatus" @change="event => updateProcessStatus(record, event.target.value)">
                     <option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</option>
                   </select>
                 </label>

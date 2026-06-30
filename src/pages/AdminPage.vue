@@ -660,6 +660,26 @@ function updateOptionalField(record, field, value) {
   record[field] = value || "";
 }
 
+async function updateProcessStatus(record, value) {
+  if (!record || record.processStatus === value) return;
+  const previous = record.processStatus;
+  record.processStatus = value;
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ processStatus: value })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    antMessage.success("状态已保存");
+    await loadOrders();
+  } catch (err) {
+    record.processStatus = previous;
+    antMessage.error(err.message || "状态保存失败");
+  }
+}
+
 async function saveOrder(record) {
   if (!record) return;
   try {
@@ -1206,7 +1226,7 @@ if (activeTab.value === "dashboard") loadDashboard();
 
             <template v-else-if="column.key === 'process'">
               <Space direction="vertical" size="small" style="width: 100%">
-                <Select v-model:value="record.processStatus" style="width: 100%">
+                <Select :value="record.processStatus" style="width: 100%" @change="value => updateProcessStatus(record, value)">
                   <Select.Option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
                 </Select>
                 <Select
