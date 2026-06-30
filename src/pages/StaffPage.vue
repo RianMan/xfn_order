@@ -304,7 +304,23 @@ function toggleStaffOrder(order) {
   staffExpandedOrderIds.value = next;
 }
 
+function validateStaffOrderBeforeSave(record) {
+  const missing = [];
+  if (!(record.paymentScreenshots || []).length) missing.push("收款截图");
+  if (String(record.recoveryAmount ?? "").trim() === "") missing.push("回收金额");
+  if (String(record.afterSalesCommissionAmount ?? "").trim() === "") missing.push("售后佣金");
+  if (!String(record.recycler || "").trim()) missing.push("回收人");
+
+  if (missing.length) {
+    showToast(`请先填写：${missing.join("、")}`, "warning");
+    return false;
+  }
+  return true;
+}
+
 async function saveStaffOrder(record, options = {}) {
+  if (options.validateRequired !== false && !validateStaffOrderBeforeSave(record)) return;
+
   const includeRemark = options.includeRemark !== false;
   const remarkAppend = includeRemark ? (staffRemarkDrafts[record.id] || "").trim() : "";
   const data = await staffRequest(`/api/staff/orders/${record.id}`, {
@@ -342,7 +358,7 @@ async function uploadStaffScreenshot(record, field, file) {
     if (!data.url) throw new Error("上传成功但没有返回图片地址");
 
     record[field] = [...(record[field] || []), data.url];
-    await saveStaffOrder(record, { includeRemark: false, silent: true });
+    await saveStaffOrder(record, { includeRemark: false, silent: true, validateRequired: false });
     showToast("截图已上传");
   } catch (err) {
     showToast(err.message || "截图上传失败", "error");
@@ -359,7 +375,7 @@ async function handleStaffFileChange(event, record, field) {
 async function removeStaffScreenshot(record, field, url) {
   if (field !== "paymentScreenshots") return;
   record[field] = (record[field] || []).filter((item) => item !== url);
-  await saveStaffOrder(record, { includeRemark: false, silent: true });
+  await saveStaffOrder(record, { includeRemark: false, silent: true, validateRequired: false });
 }
 
 function formatDiscussionTime(value) {
