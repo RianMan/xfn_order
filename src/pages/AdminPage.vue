@@ -956,7 +956,7 @@ if (activeTab.value === "dashboard") loadDashboard();
 
       <Card class="table-card">
         <template #title>
-          <Space>
+          <Space class="filter-toolbar" wrap :size="[8, 8]">
             <Input.Search
               v-model:value="filters.keyword"
               allow-clear

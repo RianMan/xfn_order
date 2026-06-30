@@ -298,6 +298,20 @@ body {
   min-height: 56px;
 }
 
+.table-card .ant-card-head-title {
+  overflow: visible;
+  padding: 12px 0;
+  white-space: normal;
+}
+
+.filter-toolbar {
+  max-width: 100%;
+}
+
+.filter-toolbar .ant-space-item {
+  display: flex;
+}
+
 .date-filter-field {
   align-items: center;
   background: #f8fafc;
@@ -307,6 +321,7 @@ body {
   gap: 6px;
   height: 32px;
   padding: 0 8px;
+  width: 238px;
 }
 
 .date-filter-field span {
@@ -322,7 +337,7 @@ body {
   box-shadow: none;
   height: 28px;
   padding: 0;
-  width: 120px;
+  width: 126px;
 }
 
 .order-block {

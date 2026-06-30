@@ -589,9 +589,6 @@ if (staffLoggedIn.value) loadStaffOrders();
               </button>
             </div>
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
-            <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
-            <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
-            <div><span>回收人</span><b>{{ order.recycler || "未填写" }}</b></div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
           </div>
 
