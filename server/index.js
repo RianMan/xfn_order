@@ -279,7 +279,7 @@ app.post("/api/admin/orders/:id/upstream-complete", requireAdmin, async (req, re
     const updatedOrder = await updateOrder(order.id, {
       processStatus: "已回款",
       status: "completed",
-      wageStatus: "工资待结",
+      wageStatus: "待发放",
       commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : 3,
       completedAt: new Date().toISOString()
     });

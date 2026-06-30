@@ -4,7 +4,7 @@ import path from "node:path";
 
 const MIN_RECEIVED_DATE = "2026-06-22 00:00:00";
 const DEFAULT_COMMISSION_AMOUNT = 3;
-const WAGE_PENDING = "工资待结";
+const WAGE_PENDING = "待发放";
 const backupDir = path.resolve("data/backups");
 
 export async function readOrders() {
@@ -49,6 +49,10 @@ function sortOrdersByBusinessTime(orders) {
 }
 
 function normalizeOrder(order) {
+  const wageStatusMap = {
+    工资待结: "待发放",
+    工资已结: "已发放"
+  };
   return {
     returnReason: "",
     shipped: "",
@@ -81,7 +85,7 @@ function normalizeOrder(order) {
     afterSalesCommissionAmount: order.afterSalesCommissionAmount ?? "",
     recycler: order.recycler ?? "",
     difficultyLevel: Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0,
-    wageStatus: order.wageStatus ?? WAGE_PENDING,
+    wageStatus: wageStatusMap[order.wageStatus] || order.wageStatus || WAGE_PENDING,
     completedAt: order.completedAt ?? "",
     paymentScreenshotUpdatedAt: order.paymentScreenshotUpdatedAt ?? "",
     status: order.status ?? "pending"

@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from "vue";
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
-const WAGE_OPTIONS = ["工资待结", "工资已结"];
+const WAGE_OPTIONS = ["待发放", "已发放"];
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
 const staffForm = reactive({ account: "", name: "", password: "" });
 const importParams = reactive({
@@ -275,7 +275,7 @@ async function saveOrder(record) {
         afterSalesCommissionAmount: record.afterSalesCommissionAmount,
         recycler: record.recycler || "",
         commissionAmount: record.commissionAmount,
-        wageStatus: record.wageStatus
+        wageStatus: record.wageStatus === "工资待结" ? "待发放" : record.wageStatus === "工资已结" ? "已发放" : record.wageStatus
       })
     });
     const index = orders.value.findIndex((item) => item.id === data.order.id);
@@ -564,7 +564,7 @@ loadOrders();
               <div><span>回收金额</span><b>{{ record.recoveryAmount || "-" }}</b></div>
               <div><span>售后佣金</span><b>{{ record.afterSalesCommissionAmount || "-" }}</b></div>
               <div><span>回收人</span><b>{{ record.recycler || "-" }}</b></div>
-              <div v-if="activeTab === 'history'"><span>工资状态</span><b>{{ record.wageStatus || "工资待结" }}</b></div>
+              <div v-if="activeTab === 'history'"><span>工资状态</span><b>{{ record.wageStatus || "待发放" }}</b></div>
             </div>
 
             <div v-if="activeTab === 'history'" class="m-admin-section">

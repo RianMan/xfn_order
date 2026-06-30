@@ -578,7 +578,7 @@ if (staffLoggedIn.value) loadStaffOrders();
         </div>
         <div class="staff-card-meta">{{ order.receivedAt }} / {{ order.refundInfo }}</div>
         <div v-if="staffTab === 'history'" class="staff-card-meta">
-          佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "工资待结" }}
+          佣金：{{ order.commissionAmount ?? 3 }} 元 / {{ order.wageStatus || "待发放" }}
         </div>
 
         <template v-if="isStaffOrderExpanded(order)">
@@ -626,7 +626,7 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
             <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
             <div><span>回收人</span><b>{{ order.recycler || "未填写" }}</b></div>
-            <div><span>工资状态</span><b>{{ order.wageStatus || "工资待结" }}</b></div>
+            <div><span>工资状态</span><b>{{ order.wageStatus || "待发放" }}</b></div>
             <div><span>完结时间</span><b>{{ formatDiscussionTime(order.completedAt) || "-" }}</b></div>
           </div>
 

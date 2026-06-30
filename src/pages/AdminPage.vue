@@ -22,7 +22,7 @@ import { CloudSyncOutlined, LogoutOutlined, UploadOutlined } from "@ant-design/i
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
 const { TextArea } = Input;
-const WAGE_OPTIONS = ["工资待结", "工资已结"];
+const WAGE_OPTIONS = ["待发放", "已发放"];
 
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
 const staffForm = reactive({ account: "", name: "", password: "" });
@@ -375,6 +375,50 @@ function formatMoney(value) {
   return Number(value || 0).toFixed(2);
 }
 
+function payrollStatus(value) {
+  if (value === "工资待结") return "待发放";
+  if (value === "工资已结") return "已发放";
+  return value || "待发放";
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function exportPendingPayroll() {
+  const rows = orders.value.filter((order) => order.status === "completed" && payrollStatus(order.wageStatus) !== "已发放");
+  if (!rows.length) {
+    antMessage.warning("暂无待发放薪资可导出");
+    return;
+  }
+
+  const headers = ["处理人", "员工账号", "订单号", "完结时间", "回收金额", "售后佣金", "回收人", "佣金", "薪资状态"];
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...rows.map((order) => [
+      order.assigneeName || order.handler || "",
+      order.assigneeAccount || "",
+      order.orderNumber || "",
+      formatDiscussionTime(order.completedAt) || "",
+      order.recoveryAmount ?? "",
+      order.afterSalesCommissionAmount ?? "",
+      order.recycler || "",
+      order.commissionAmount ?? "",
+      payrollStatus(order.wageStatus)
+    ].map(csvCell).join(","))
+  ];
+  const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `待发放薪资表-${dateOnly(new Date().toISOString())}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 async function loadDashboard() {
   if (!loggedIn.value) return;
   dashboardLoading.value = true;
@@ -570,7 +614,7 @@ async function saveOrder(record) {
         afterSalesCommissionAmount: record.afterSalesCommissionAmount,
         recycler: record.recycler || "",
         commissionAmount: record.commissionAmount,
-        wageStatus: record.wageStatus,
+        wageStatus: payrollStatus(record.wageStatus),
         completedAt: record.completedAt || ""
       })
     });
@@ -1020,6 +1064,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                 @change="pager.current = 1"
               />
             </label>
+            <Button v-if="activeTab === 'history'" type="primary" @click="exportPendingPayroll">导出待发放薪资表</Button>
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
