@@ -305,6 +305,8 @@ function toggleStaffOrder(order) {
 }
 
 function validateStaffOrderBeforeSave(record) {
+  if (record.processStatus !== "已回款") return true;
+
   const missing = [];
   if (!(record.paymentScreenshots || []).length) missing.push("收款截图");
   if (String(record.recoveryAmount ?? "").trim() === "") missing.push("回收金额");
