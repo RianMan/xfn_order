@@ -61,6 +61,7 @@ function normalizeOrder(order) {
     commissionAmount: DEFAULT_COMMISSION_AMOUNT,
     recoveryAmount: "",
     afterSalesCommissionAmount: "",
+    recycler: "",
     wageStatus: WAGE_PENDING,
     completedAt: "",
     paymentScreenshotUpdatedAt: "",
@@ -78,6 +79,7 @@ function normalizeOrder(order) {
     commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT,
     recoveryAmount: order.recoveryAmount ?? "",
     afterSalesCommissionAmount: order.afterSalesCommissionAmount ?? "",
+    recycler: order.recycler ?? "",
     difficultyLevel: Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0,
     wageStatus: order.wageStatus ?? WAGE_PENDING,
     completedAt: order.completedAt ?? "",
@@ -335,6 +337,7 @@ export async function updateOrder(id, patch) {
     "commissionAmount",
     "recoveryAmount",
     "afterSalesCommissionAmount",
+    "recycler",
     "difficultyLevel",
     "wageStatus",
     "completedAt"
@@ -471,7 +474,8 @@ export async function updateStaffOrder(id, staff, patch) {
     "processStatus",
     "paymentScreenshots",
     "recoveryAmount",
-    "afterSalesCommissionAmount"
+    "afterSalesCommissionAmount",
+    "recycler"
   ];
 
   for (const field of allowedFields) {

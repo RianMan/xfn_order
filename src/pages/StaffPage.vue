@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
-import { PROCESS_OPTIONS } from "../constants.js";
+import { PROCESS_OPTIONS, RECYCLER_OPTIONS } from "../constants.js";
 
 const staffLogin = reactive({ account: "", password: "" });
 const staffFilters = reactive({ processStatus: "", refundInfo: "", orderNumber: "" });
@@ -314,6 +314,7 @@ async function saveStaffOrder(record, options = {}) {
       paymentScreenshots: record.paymentScreenshots || [],
       recoveryAmount: record.recoveryAmount,
       afterSalesCommissionAmount: record.afterSalesCommissionAmount,
+      recycler: record.recycler || "",
       remarkAppend
     })
   });
@@ -590,6 +591,7 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
             <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
             <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
+            <div><span>回收人</span><b>{{ order.recycler || "未填写" }}</b></div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
           </div>
 
@@ -608,6 +610,7 @@ if (staffLoggedIn.value) loadStaffOrders();
             <div><span>佣金</span><b>{{ order.commissionAmount ?? 3 }} 元</b></div>
             <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
             <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
+            <div><span>回收人</span><b>{{ order.recycler || "未填写" }}</b></div>
             <div><span>工资状态</span><b>{{ order.wageStatus || "工资待结" }}</b></div>
             <div><span>完结时间</span><b>{{ formatDiscussionTime(order.completedAt) || "-" }}</b></div>
           </div>
@@ -642,6 +645,12 @@ if (staffLoggedIn.value) loadStaffOrders();
               </label>
               <label>售后佣金
                 <input v-model="order.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="填写售后佣金" />
+              </label>
+              <label>回收人
+                <select v-model="order.recycler">
+                  <option value="">请选择回收人</option>
+                  <option v-for="item in RECYCLER_OPTIONS" :key="item" :value="item">{{ item }}</option>
+                </select>
               </label>
             </div>
             <label>已有备注

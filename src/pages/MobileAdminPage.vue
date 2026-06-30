@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
-import { ADDRESS_OPTIONS, PROCESS_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
+import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
 const WAGE_OPTIONS = ["工资待结", "工资已结"];
 const login = reactive({ username: "xiaofuniya", password: "abcd1234" });
@@ -273,6 +273,7 @@ async function saveOrder(record) {
         otherScreenshots: record.otherScreenshots || [],
         recoveryAmount: record.recoveryAmount,
         afterSalesCommissionAmount: record.afterSalesCommissionAmount,
+        recycler: record.recycler || "",
         commissionAmount: record.commissionAmount,
         wageStatus: record.wageStatus
       })
@@ -562,6 +563,7 @@ loadOrders();
               <div v-if="activeTab === 'history'"><span>佣金</span><b>{{ record.commissionAmount ?? 3 }} 元</b></div>
               <div><span>回收金额</span><b>{{ record.recoveryAmount || "-" }}</b></div>
               <div><span>售后佣金</span><b>{{ record.afterSalesCommissionAmount || "-" }}</b></div>
+              <div><span>回收人</span><b>{{ record.recycler || "-" }}</b></div>
               <div v-if="activeTab === 'history'"><span>工资状态</span><b>{{ record.wageStatus || "工资待结" }}</b></div>
             </div>
 
@@ -622,6 +624,12 @@ loadOrders();
                   <input v-model="record.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="填写售后佣金" />
                 </label>
               </div>
+              <label>回收人
+                <select v-model="record.recycler">
+                  <option value="">请选择回收人</option>
+                  <option v-for="item in RECYCLER_OPTIONS" :key="item" :value="item">{{ item }}</option>
+                </select>
+              </label>
               <label>备注<textarea v-model="record.internalRemark" rows="3" placeholder="填写备注" /></label>
             </div>
 

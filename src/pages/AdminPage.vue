@@ -19,7 +19,7 @@ import {
   Upload
 } from "ant-design-vue";
 import { CloudSyncOutlined, LogoutOutlined, UploadOutlined } from "@ant-design/icons-vue";
-import { ADDRESS_OPTIONS, PROCESS_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
+import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
 
 const { TextArea } = Input;
 const WAGE_OPTIONS = ["工资待结", "工资已结"];
@@ -49,8 +49,8 @@ const filters = reactive({
   assigneeAccount: undefined,
   difficulty: undefined,
   returnAddress: undefined,
-  paymentScreenshotStart: "",
-  paymentScreenshotEnd: ""
+  paymentScreenshotDate: "",
+  completedDate: ""
 });
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
@@ -173,18 +173,15 @@ const filteredOrders = computed(() => {
       (filters.difficulty === "hard" ? Number(order.difficultyLevel || 0) > 0 : Number(order.difficultyLevel || 0) === 0);
     const returnAddressOk = !filters.returnAddress || order.returnAddress === filters.returnAddress;
     const paymentScreenshotDate = dateOnly(order.paymentScreenshotUpdatedAt);
-    const hasPaymentScreenshotDateFilter = Boolean(filters.paymentScreenshotStart || filters.paymentScreenshotEnd);
-    const paymentScreenshotDateOk =
-      !hasPaymentScreenshotDateFilter ||
-      Boolean(paymentScreenshotDate) &&
-        (!filters.paymentScreenshotStart || paymentScreenshotDate >= filters.paymentScreenshotStart) &&
-        (!filters.paymentScreenshotEnd || paymentScreenshotDate <= filters.paymentScreenshotEnd);
+    const completedDate = dateOnly(order.completedAt);
+    const paymentScreenshotDateOk = !filters.paymentScreenshotDate || paymentScreenshotDate === filters.paymentScreenshotDate;
+    const completedDateOk = !filters.completedDate || completedDate === filters.completedDate;
     const keywordOk =
       !keyword ||
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && difficultyOk && returnAddressOk && paymentScreenshotDateOk && keywordOk;
+    return statusOk && assigneeOk && difficultyOk && returnAddressOk && paymentScreenshotDateOk && completedDateOk && keywordOk;
   });
 });
 
@@ -571,6 +568,7 @@ async function saveOrder(record) {
         otherScreenshots: record.otherScreenshots || [],
         recoveryAmount: record.recoveryAmount,
         afterSalesCommissionAmount: record.afterSalesCommissionAmount,
+        recycler: record.recycler || "",
         commissionAmount: record.commissionAmount,
         wageStatus: record.wageStatus,
         completedAt: record.completedAt || ""
@@ -680,8 +678,8 @@ function resetFilters() {
   filters.assigneeAccount = undefined;
   filters.difficulty = undefined;
   filters.returnAddress = undefined;
-  filters.paymentScreenshotStart = "";
-  filters.paymentScreenshotEnd = "";
+  filters.paymentScreenshotDate = "";
+  filters.completedDate = "";
   pager.current = 1;
 }
 
@@ -1005,20 +1003,20 @@ if (activeTab.value === "dashboard") loadDashboard();
               <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
             </Select>
             <label class="date-filter-field">
-              <span>截图开始</span>
+              <span>收款截图日期</span>
               <Input
-                v-model:value="filters.paymentScreenshotStart"
+                v-model:value="filters.paymentScreenshotDate"
                 type="date"
-                title="收款截图开始日期"
+                title="按收款截图上传/更新时间筛选"
                 @change="pager.current = 1"
               />
             </label>
             <label class="date-filter-field">
-              <span>截图结束</span>
+              <span>已完结日期</span>
               <Input
-                v-model:value="filters.paymentScreenshotEnd"
+                v-model:value="filters.completedDate"
                 type="date"
-                title="收款截图结束日期"
+                title="按已完结时间筛选"
                 @change="pager.current = 1"
               />
             </label>
@@ -1114,6 +1112,15 @@ if (activeTab.value === "dashboard") loadDashboard();
               <Space direction="vertical" size="small" style="width: 100%">
                 <Input v-model:value="record.recoveryAmount" type="number" min="0" step="0.01" placeholder="回收金额" />
                 <Input v-model:value="record.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="售后佣金" />
+                <Select
+                  :value="record.recycler || undefined"
+                  allow-clear
+                  placeholder="回收人"
+                  style="width: 100%"
+                  @change="value => updateOptionalField(record, 'recycler', value)"
+                >
+                  <Select.Option v-for="item in RECYCLER_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
+                </Select>
               </Space>
             </template>
 
