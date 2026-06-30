@@ -312,6 +312,8 @@ async function saveStaffOrder(record, options = {}) {
     body: JSON.stringify({
       processStatus: record.processStatus,
       paymentScreenshots: record.paymentScreenshots || [],
+      recoveryAmount: record.recoveryAmount,
+      afterSalesCommissionAmount: record.afterSalesCommissionAmount,
       remarkAppend
     })
   });
@@ -586,6 +588,8 @@ if (staffLoggedIn.value) loadStaffOrders();
               </button>
             </div>
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
+            <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
+            <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
           </div>
 
@@ -602,6 +606,8 @@ if (staffLoggedIn.value) loadStaffOrders();
               </button>
             </div>
             <div><span>佣金</span><b>{{ order.commissionAmount ?? 3 }} 元</b></div>
+            <div><span>回收金额</span><b>{{ order.recoveryAmount || "未填写" }}</b></div>
+            <div><span>售后佣金</span><b>{{ order.afterSalesCommissionAmount || "未填写" }}</b></div>
             <div><span>工资状态</span><b>{{ order.wageStatus || "工资待结" }}</b></div>
             <div><span>完结时间</span><b>{{ formatDiscussionTime(order.completedAt) || "-" }}</b></div>
           </div>
@@ -630,6 +636,12 @@ if (staffLoggedIn.value) loadStaffOrders();
                     <path d="M4 6l4 4 4-4" />
                   </svg>
                 </button>
+              </label>
+              <label>回收金额
+                <input v-model="order.recoveryAmount" type="number" min="0" step="0.01" placeholder="填写回收金额" />
+              </label>
+              <label>售后佣金
+                <input v-model="order.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="填写售后佣金" />
               </label>
             </div>
             <label>已有备注

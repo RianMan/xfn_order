@@ -298,6 +298,33 @@ body {
   min-height: 56px;
 }
 
+.date-filter-field {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  display: inline-flex;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+}
+
+.date-filter-field span {
+  color: #64748b;
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.date-filter-field .ant-input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  height: 28px;
+  padding: 0;
+  width: 118px;
+}
+
 .order-block {
   display: grid;
   gap: 3px;

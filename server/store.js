@@ -59,6 +59,8 @@ function normalizeOrder(order) {
     internalRemark: "",
     discussion: [],
     commissionAmount: DEFAULT_COMMISSION_AMOUNT,
+    recoveryAmount: "",
+    afterSalesCommissionAmount: "",
     wageStatus: WAGE_PENDING,
     completedAt: "",
     paymentScreenshotUpdatedAt: "",
@@ -74,6 +76,8 @@ function normalizeOrder(order) {
     otherScreenshots: order.otherScreenshots ?? order.screenshots ?? [],
     discussion: Array.isArray(order.discussion) ? order.discussion : [],
     commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT,
+    recoveryAmount: order.recoveryAmount ?? "",
+    afterSalesCommissionAmount: order.afterSalesCommissionAmount ?? "",
     difficultyLevel: Number.isFinite(Number(order.difficultyLevel)) ? Number(order.difficultyLevel) : 0,
     wageStatus: order.wageStatus ?? WAGE_PENDING,
     completedAt: order.completedAt ?? "",
@@ -329,6 +333,8 @@ export async function updateOrder(id, patch) {
     "screenshots",
     "status",
     "commissionAmount",
+    "recoveryAmount",
+    "afterSalesCommissionAmount",
     "difficultyLevel",
     "wageStatus",
     "completedAt"
@@ -352,6 +358,12 @@ export async function updateOrder(id, patch) {
   }
   if ("commissionAmount" in patch) {
     order.commissionAmount = Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : DEFAULT_COMMISSION_AMOUNT;
+  }
+  if ("recoveryAmount" in patch) {
+    order.recoveryAmount = Number.isFinite(Number(order.recoveryAmount)) ? Number(order.recoveryAmount) : "";
+  }
+  if ("afterSalesCommissionAmount" in patch) {
+    order.afterSalesCommissionAmount = Number.isFinite(Number(order.afterSalesCommissionAmount)) ? Number(order.afterSalesCommissionAmount) : "";
   }
   if ("paymentScreenshots" in patch && !sameStringArray(oldPaymentScreenshots, order.paymentScreenshots)) {
     order.paymentScreenshotUpdatedAt = new Date().toISOString();
@@ -457,7 +469,9 @@ export async function updateStaffOrder(id, staff, patch) {
 
   const allowedFields = [
     "processStatus",
-    "paymentScreenshots"
+    "paymentScreenshots",
+    "recoveryAmount",
+    "afterSalesCommissionAmount"
   ];
 
   for (const field of allowedFields) {
@@ -466,6 +480,12 @@ export async function updateStaffOrder(id, staff, patch) {
 
   if ("paymentScreenshots" in patch && !sameStringArray(oldPaymentScreenshots, order.paymentScreenshots)) {
     order.paymentScreenshotUpdatedAt = new Date().toISOString();
+  }
+  if ("recoveryAmount" in patch) {
+    order.recoveryAmount = Number.isFinite(Number(order.recoveryAmount)) ? Number(order.recoveryAmount) : "";
+  }
+  if ("afterSalesCommissionAmount" in patch) {
+    order.afterSalesCommissionAmount = Number.isFinite(Number(order.afterSalesCommissionAmount)) ? Number(order.afterSalesCommissionAmount) : "";
   }
   markPaidIfNeeded(order, patch);
   appendStaffRemark(order, staff, patch.remarkAppend);

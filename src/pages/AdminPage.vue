@@ -201,6 +201,7 @@ const baseColumns = [
   { title: "退货单号", key: "returnTrackingNo", width: 180 },
   { title: "退货地址", key: "returnAddress", width: 120 },
   { title: "处理", key: "process", width: 220 },
+  { title: "金额", key: "amounts", width: 180 },
   { title: "备注", key: "remark", width: 220 },
   { title: "收款截图", key: "paymentScreenshots", width: 180 },
   { title: "其他截图", key: "otherScreenshots", width: 180 },
@@ -568,6 +569,8 @@ async function saveOrder(record) {
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
         otherScreenshots: record.otherScreenshots || [],
+        recoveryAmount: record.recoveryAmount,
+        afterSalesCommissionAmount: record.afterSalesCommissionAmount,
         commissionAmount: record.commissionAmount,
         wageStatus: record.wageStatus,
         completedAt: record.completedAt || ""
@@ -1001,20 +1004,24 @@ if (activeTab.value === "dashboard") loadDashboard();
             >
               <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
             </Select>
-            <Input
-              v-model:value="filters.paymentScreenshotStart"
-              type="date"
-              title="收款截图开始日期"
-              style="width: 150px"
-              @change="pager.current = 1"
-            />
-            <Input
-              v-model:value="filters.paymentScreenshotEnd"
-              type="date"
-              title="收款截图结束日期"
-              style="width: 150px"
-              @change="pager.current = 1"
-            />
+            <label class="date-filter-field">
+              <span>截图开始</span>
+              <Input
+                v-model:value="filters.paymentScreenshotStart"
+                type="date"
+                title="收款截图开始日期"
+                @change="pager.current = 1"
+              />
+            </label>
+            <label class="date-filter-field">
+              <span>截图结束</span>
+              <Input
+                v-model:value="filters.paymentScreenshotEnd"
+                type="date"
+                title="收款截图结束日期"
+                @change="pager.current = 1"
+              />
+            </label>
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
@@ -1028,7 +1035,7 @@ if (activeTab.value === "dashboard") loadDashboard();
           row-key="id"
           size="middle"
           bordered
-          :scroll="{ x: 2160 }"
+          :scroll="{ x: 2340 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'order'">
@@ -1100,6 +1107,13 @@ if (activeTab.value === "dashboard") loadDashboard();
                 >
                   <Select.Option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</Select.Option>
                 </Select>
+              </Space>
+            </template>
+
+            <template v-else-if="column.key === 'amounts'">
+              <Space direction="vertical" size="small" style="width: 100%">
+                <Input v-model:value="record.recoveryAmount" type="number" min="0" step="0.01" placeholder="回收金额" />
+                <Input v-model:value="record.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="售后佣金" />
               </Space>
             </template>
 

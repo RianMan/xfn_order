@@ -271,6 +271,8 @@ async function saveOrder(record) {
         internalRemark: record.internalRemark,
         paymentScreenshots: record.paymentScreenshots || [],
         otherScreenshots: record.otherScreenshots || [],
+        recoveryAmount: record.recoveryAmount,
+        afterSalesCommissionAmount: record.afterSalesCommissionAmount,
         commissionAmount: record.commissionAmount,
         wageStatus: record.wageStatus
       })
@@ -558,6 +560,8 @@ loadOrders();
               <div><span>申请时间</span><b>{{ record.appliedAt || "-" }}</b></div>
               <div><span>处理时间</span><b>{{ record.handledAt || "-" }}</b></div>
               <div v-if="activeTab === 'history'"><span>佣金</span><b>{{ record.commissionAmount ?? 3 }} 元</b></div>
+              <div><span>回收金额</span><b>{{ record.recoveryAmount || "-" }}</b></div>
+              <div><span>售后佣金</span><b>{{ record.afterSalesCommissionAmount || "-" }}</b></div>
               <div v-if="activeTab === 'history'"><span>工资状态</span><b>{{ record.wageStatus || "工资待结" }}</b></div>
             </div>
 
@@ -608,6 +612,14 @@ loadOrders();
                     <option value="">公共池</option>
                     <option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</option>
                   </select>
+                </label>
+              </div>
+              <div class="m-admin-two-col">
+                <label>回收金额
+                  <input v-model="record.recoveryAmount" type="number" min="0" step="0.01" placeholder="填写回收金额" />
+                </label>
+                <label>售后佣金
+                  <input v-model="record.afterSalesCommissionAmount" type="number" min="0" step="0.01" placeholder="填写售后佣金" />
                 </label>
               </div>
               <label>备注<textarea v-model="record.internalRemark" rows="3" placeholder="填写备注" /></label>
