@@ -40,11 +40,23 @@ function orderBusinessTime(order) {
   return String(order.receivedAt || order.appliedAt || order.createdAt || "");
 }
 
+function completedTime(order) {
+  return String(order.completedAt || order.updatedAt || order.createdAt || "");
+}
+
 function sortOrdersByBusinessTime(orders) {
   return [...orders].sort((a, b) => {
     const byTime = orderBusinessTime(a).localeCompare(orderBusinessTime(b));
     if (byTime) return byTime;
     return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+  });
+}
+
+function sortOrdersByCompletedTime(orders) {
+  return [...orders].sort((a, b) => {
+    const byTime = completedTime(b).localeCompare(completedTime(a));
+    if (byTime) return byTime;
+    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
   });
 }
 
@@ -164,7 +176,7 @@ export async function importOrders(incoming) {
 }
 
 function filterOrdersByScope(orders, scope = "active") {
-  if (scope === "history") return orders.filter((order) => order.status === "completed");
+  if (scope === "history") return sortOrdersByCompletedTime(orders.filter((order) => order.status === "completed"));
   return orders.filter((order) => order.status !== "completed");
 }
 
@@ -220,8 +232,6 @@ function isPaidOrder(order) {
 
 function markPaidIfNeeded(order, patch) {
   if (patch?.processStatus !== "已回款") return;
-  order.status = "completed";
-  order.completedAt = order.completedAt || new Date().toISOString();
   order.wageStatus = order.wageStatus || WAGE_PENDING;
   order.commissionAmount = Number.isFinite(Number(order.commissionAmount))
     ? Number(order.commissionAmount)
@@ -431,13 +441,15 @@ export async function claimOrderById(id, staff) {
 
 export async function readStaffOrders(staff, status = "", scope = "active") {
   const orders = await readOrders();
-  return orders.filter((order) => {
+  const filtered = orders.filter((order) => {
     const ownerOk = order.assigneeAccount === staff.account;
     const scopeOk = scope === "history" ? order.status === "completed" : order.status !== "completed";
     const statusOk = !status || order.processStatus === status;
     const visibleStatusOk = scope === "history" || order.processStatus !== "无法处理";
     return ownerOk && scopeOk && statusOk && visibleStatusOk;
-  }).map(staffVisibleOrder);
+  });
+
+  return (scope === "history" ? sortOrdersByCompletedTime(filtered) : filtered).map(staffVisibleOrder);
 }
 
 function beijingTimeText() {
