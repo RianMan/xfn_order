@@ -293,6 +293,28 @@ async function saveOrder(record) {
   }
 }
 
+async function restoreToLedger(record) {
+  if (!record) return;
+  if (!window.confirm(`确认把订单 ${record.orderNumber} 移回订单台账吗？处理状态会重置为未处理。`)) return;
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "pending",
+        processStatus: "未处理",
+        completedAt: ""
+      })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    showNotice("已移回订单台账");
+    await loadOrders();
+  } catch (err) {
+    showNotice(err.message || "移回失败");
+  }
+}
+
 async function uploadScreenshot(record, field, file) {
   try {
     const form = new FormData();
@@ -688,6 +710,7 @@ loadOrders();
 
             <div class="m-admin-action-bar">
               <button type="button" class="primary" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</button>
+              <button v-if="activeTab === 'history'" type="button" @click="restoreToLedger(record)">移回台账</button>
               <button v-if="activeTab !== 'history'" type="button" @click="openAnnotateModal(record)">标注</button>
               <button v-if="activeTab !== 'history'" type="button" class="danger" @click="completeUpstream(record)">已完结</button>
             </div>

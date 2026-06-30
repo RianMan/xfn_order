@@ -624,6 +624,29 @@ async function completeUpstream(record) {
   }
 }
 
+async function restoreToLedger(record) {
+  if (!record) return;
+  const confirmed = window.confirm(`确认把订单 ${record.orderNumber} 移回订单台账吗？处理状态会重置为未处理。`);
+  if (!confirmed) return;
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "pending",
+        processStatus: "未处理",
+        completedAt: ""
+      })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    antMessage.success("已移回订单台账");
+    await loadOrders();
+  } catch (err) {
+    antMessage.error(err.message || "移回失败");
+  }
+}
+
 function updateAssignee(record, account) {
   const cleanAccount = account || "";
   const staff = staffList.value.find((item) => item.account === cleanAccount);
@@ -1275,6 +1298,7 @@ if (activeTab.value === "dashboard") loadDashboard();
             <template v-else-if="column.key === 'action'">
               <Space direction="vertical" size="small">
                 <Button type="primary" size="small" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</Button>
+                <Button v-if="activeTab === 'history'" size="small" @click="restoreToLedger(record)">移回台账</Button>
                 <Button v-if="activeTab !== 'history'" size="small" @click="openAnnotateModal(record)">标注</Button>
                 <Button v-if="activeTab !== 'history'" danger size="small" @click="completeUpstream(record)">已完结</Button>
                 <span class="time-line">完结：{{ formatDiscussionTime(record.completedAt) || "-" }}</span>
