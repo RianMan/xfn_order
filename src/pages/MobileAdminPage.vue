@@ -7,8 +7,9 @@ const ROLE_OPTIONS = [
   { value: "operator", label: "操作员" },
   { value: "admin", label: "admin" }
 ];
+const storedAdminUser = localStorage.getItem("adminUser");
 const login = reactive({ username: "", password: "" });
-const staffForm = reactive({ account: "", name: "", password: "", role: "operator" });
+const staffForm = reactive({ account: "", name: "", password: "", role: "operator", disabled: false });
 const importParams = reactive({
   p: "1",
   fenyei: "10",
@@ -19,11 +20,13 @@ const importParams = reactive({
 });
 
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
+const currentAdmin = ref(storedAdminUser ? JSON.parse(storedAdminUser) : (localStorage.getItem("adminToken") ? { role: "admin" } : null));
 const activeTab = ref("orders");
 const orders = ref([]);
 const staffList = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
+const globalLoadingText = ref("");
 const notice = ref("");
 const filters = reactive({ keyword: "", processStatus: "", assigneeAccount: "", difficulty: "", returnAddress: "" });
 const pager = reactive({ current: 1, pageSize: 8 });
@@ -31,13 +34,15 @@ const expandedKeys = ref(new Set());
 const expansionReady = ref(false);
 const discussionDrafts = reactive({});
 const editingStaffId = ref("");
-const staffEditForm = reactive({ account: "", name: "", password: "", role: "operator" });
+const staffEditForm = reactive({ account: "", name: "", password: "", role: "operator", disabled: false });
 const annotateModal = reactive({
   open: false,
   loading: false,
   order: null,
   note: ""
 });
+
+const isSuperAdmin = computed(() => currentAdmin.value?.role === "admin");
 
 function authHeaders() {
   const token = localStorage.getItem("adminToken");
@@ -136,6 +141,8 @@ async function doLogin() {
       body: JSON.stringify(login)
     });
     localStorage.setItem("adminToken", data.token);
+    localStorage.setItem("adminUser", JSON.stringify(data.user || null));
+    currentAdmin.value = data.user || null;
     loggedIn.value = true;
     showNotice("登录成功");
     await loadOrders();
@@ -146,6 +153,8 @@ async function doLogin() {
 
 function logout() {
   localStorage.removeItem("adminToken");
+  localStorage.removeItem("adminUser");
+  currentAdmin.value = null;
   loggedIn.value = false;
   orders.value = [];
 }
@@ -179,6 +188,12 @@ async function loadStaffList() {
 }
 
 async function switchTab(tab) {
+  if (tab === "staff" && !isSuperAdmin.value) {
+    activeTab.value = "orders";
+    pager.current = 1;
+    await loadOrders();
+    return;
+  }
   activeTab.value = tab;
   pager.current = 1;
   if (tab === "orders" || tab === "history") await loadOrders();
@@ -195,6 +210,7 @@ async function createStaffAccount() {
     staffForm.name = "";
     staffForm.password = "";
     staffForm.role = "operator";
+    staffForm.disabled = false;
     showNotice("员工已添加");
     await loadStaffList();
   } catch (err) {
@@ -207,6 +223,7 @@ function startEditStaff(item) {
   staffEditForm.account = item.account;
   staffEditForm.name = item.name;
   staffEditForm.role = item.role || "operator";
+  staffEditForm.disabled = Boolean(item.disabled);
   staffEditForm.password = "";
 }
 
@@ -216,6 +233,7 @@ function cancelEditStaff() {
   staffEditForm.name = "";
   staffEditForm.password = "";
   staffEditForm.role = "operator";
+  staffEditForm.disabled = false;
 }
 
 async function saveStaffEdit(item) {
@@ -235,6 +253,7 @@ async function saveStaffEdit(item) {
 
 async function syncOrders() {
   loading.value = true;
+  globalLoadingText.value = "正在同步第三方订单，请稍候";
   try {
     const data = await request("/api/admin/import", {
       method: "POST",
@@ -248,6 +267,7 @@ async function syncOrders() {
     showNotice(err.message);
   } finally {
     loading.value = false;
+    globalLoadingText.value = "";
   }
 }
 
@@ -436,6 +456,7 @@ async function completeUpstream(record) {
   if (!record) return;
   if (!window.confirm(`确认把订单 ${record.orderNumber} 标记为已完结吗？`)) return;
 
+  globalLoadingText.value = "正在完结订单并同步远程数据，请稍候";
   try {
     const data = await request(`/api/admin/orders/${record.id}/upstream-complete`, {
       method: "POST",
@@ -447,6 +468,8 @@ async function completeUpstream(record) {
     await loadOrders();
   } catch (err) {
     showNotice(err.message || "完结失败");
+  } finally {
+    globalLoadingText.value = "";
   }
 }
 
@@ -532,6 +555,13 @@ loadOrders();
   </main>
 
   <main v-else class="mobile-admin-page">
+    <div v-if="globalLoadingText" class="global-loading-mask">
+      <div class="global-loading-card">
+        <i></i>
+        <span>{{ globalLoadingText }}</span>
+      </div>
+    </div>
+
     <header class="mobile-admin-header">
       <div>
         <strong>售后后台</strong>
@@ -544,7 +574,7 @@ loadOrders();
       <button type="button" :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">工单</button>
       <button type="button" :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史</button>
       <button type="button" :class="{ active: activeTab === 'sync' }" @click="switchTab('sync')">同步</button>
-      <button type="button" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号</button>
+      <button v-if="isSuperAdmin" type="button" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号</button>
     </nav>
 
     <section v-if="activeTab === 'orders' || activeTab === 'history'" class="mobile-admin-content">
@@ -731,8 +761,8 @@ loadOrders();
             <div class="m-admin-action-bar">
               <button type="button" class="primary" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</button>
               <button v-if="activeTab === 'history'" type="button" @click="restoreToLedger(record)">移回台账</button>
-              <button v-if="activeTab !== 'history'" type="button" @click="openAnnotateModal(record)">标注</button>
-              <button v-if="activeTab !== 'history'" type="button" class="danger" @click="completeUpstream(record)">已完结</button>
+              <button v-if="activeTab !== 'history' && isSuperAdmin" type="button" @click="openAnnotateModal(record)">标注</button>
+              <button v-if="activeTab !== 'history' && isSuperAdmin" type="button" class="danger" @click="completeUpstream(record)">已完结</button>
             </div>
           </div>
         </article>
@@ -772,6 +802,12 @@ loadOrders();
             <option v-for="role in ROLE_OPTIONS" :key="role.value" :value="role.value">{{ role.label }}</option>
           </select>
         </label>
+        <label>状态
+          <select v-model="staffForm.disabled">
+            <option :value="false">启用</option>
+            <option :value="true">禁用</option>
+          </select>
+        </label>
         <button type="button" class="mobile-admin-primary" @click="createStaffAccount">添加账号</button>
       </div>
 
@@ -785,6 +821,12 @@ loadOrders();
                 <option v-for="role in ROLE_OPTIONS" :key="role.value" :value="role.value">{{ role.label }}</option>
               </select>
             </label>
+            <label>状态
+              <select v-model="staffEditForm.disabled">
+                <option :value="false">启用</option>
+                <option :value="true">禁用</option>
+              </select>
+            </label>
             <label>新密码<input v-model="staffEditForm.password" type="password" placeholder="留空则不修改" /></label>
             <div class="m-admin-action-bar">
               <button type="button" class="primary" @click="saveStaffEdit(item)">保存</button>
@@ -795,6 +837,7 @@ loadOrders();
             <strong>{{ item.name }}</strong>
             <span>账号：{{ item.account }}</span>
             <span>权限：{{ item.role === "admin" ? "admin" : "操作员" }}</span>
+            <span>状态：{{ item.disabled ? "禁用" : "启用" }}</span>
             <span>创建时间：{{ item.createdAt }}</span>
             <button type="button" @click="startEditStaff(item)">编辑</button>
           </template>

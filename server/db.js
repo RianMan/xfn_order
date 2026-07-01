@@ -58,8 +58,8 @@ function migrateLegacyStaff(database) {
   if (count > 0) return;
 
   const insert = database.prepare(`
-    INSERT OR IGNORE INTO staff (id, account, name, password, role, created_at)
-    VALUES (:id, :account, :name, :password, :role, :created_at)
+    INSERT OR IGNORE INTO staff (id, account, name, password, role, disabled, created_at)
+    VALUES (:id, :account, :name, :password, :role, :disabled, :created_at)
   `);
 
   for (const staff of readLegacyJson(legacyStaffPath, "staff")) {
@@ -70,6 +70,7 @@ function migrateLegacyStaff(database) {
       name: staff.name ?? "",
       password: staff.password ?? "",
       role: staff.role ?? "operator",
+      disabled: staff.disabled ? 1 : 0,
       created_at: staff.createdAt ?? new Date().toISOString()
     });
   }
@@ -79,6 +80,9 @@ function ensureStaffRoleColumn(database) {
   const columns = database.prepare("PRAGMA table_info(staff)").all().map((row) => row.name);
   if (!columns.includes("role")) {
     database.exec("ALTER TABLE staff ADD COLUMN role TEXT NOT NULL DEFAULT 'operator'");
+  }
+  if (!columns.includes("disabled")) {
+    database.exec("ALTER TABLE staff ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
   }
 }
 
@@ -113,6 +117,7 @@ export function getDb() {
       name TEXT NOT NULL,
       password TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'operator',
+      disabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
   `);

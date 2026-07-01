@@ -24,7 +24,7 @@ import {
   updateOrder,
   updateStaffOrder
 } from "./store.js";
-import { createStaff, hasAdminStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
+import { createStaff, findStaffById, hasAdminStaff, readStaff, updateStaff, verifyStaff } from "./staffStore.js";
 import { syncUpstreamOrders } from "./sync.js";
 import { annotateUpstreamOrder, completeUpstreamOrder } from "./upstream.js";
 
@@ -53,7 +53,7 @@ function loadSessions() {
     };
   } catch {
     return {
-      sessions: new Set(),
+      sessions: new Map(),
       staffSessions: new Map()
     };
   }
@@ -103,12 +103,32 @@ function getToken(req) {
 
 function requireAdmin(req, res, next) {
   const admin = sessions.get(getToken(req));
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin", "operator"].includes(admin.role)) {
     res.status(401).json({ message: "请先登录" });
     return;
   }
-  req.admin = admin;
+  const current = admin.id === "bootstrap-admin" ? admin : findStaffById(admin.id);
+  if (!current || current.disabled) {
+    res.status(403).json({ message: "账号已禁用" });
+    return;
+  }
+  req.admin = {
+    id: current.id,
+    account: current.account,
+    name: current.name,
+    role: current.role
+  };
   next();
+}
+
+function requireSuperAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== "admin") {
+      res.status(403).json({ message: "只有管理员可以操作" });
+      return;
+    }
+    next();
+  });
 }
 
 function requireStaff(req, res, next) {
@@ -117,7 +137,17 @@ function requireStaff(req, res, next) {
     res.status(401).json({ message: "请先登录" });
     return;
   }
-  req.staff = staff;
+  const current = findStaffById(staff.id);
+  if (!current || current.disabled) {
+    res.status(403).json({ message: "账号已禁用" });
+    return;
+  }
+  req.staff = {
+    id: current.id,
+    account: current.account,
+    name: current.name,
+    role: current.role
+  };
   next();
 }
 
@@ -156,8 +186,8 @@ app.post("/api/login", async (req, res) => {
     res.status(401).json({ message: "账号或密码错误" });
     return;
   }
-  if (staff && staff.role !== "admin") {
-    res.status(403).json({ message: "该账号没有后台管理权限" });
+  if (staff?.disabled) {
+    res.status(403).json({ message: "账号已禁用" });
     return;
   }
 
@@ -184,7 +214,7 @@ app.get("/api/admin/staff", requireAdmin, async (_req, res) => {
   res.json({ staff: staff.map(({ password, ...item }) => item) });
 });
 
-app.post("/api/admin/staff", requireAdmin, async (req, res) => {
+app.post("/api/admin/staff", requireSuperAdmin, async (req, res) => {
   try {
     const item = await createStaff(req.body ?? {});
     const { password, ...safeItem } = item;
@@ -194,7 +224,7 @@ app.post("/api/admin/staff", requireAdmin, async (req, res) => {
   }
 });
 
-app.patch("/api/admin/staff/:id", requireAdmin, async (req, res) => {
+app.patch("/api/admin/staff/:id", requireSuperAdmin, async (req, res) => {
   try {
     const item = await updateStaff(req.params.id, req.body ?? {});
     const { password, ...safeItem } = item;
@@ -246,7 +276,7 @@ app.post("/api/admin/orders/:id/discussion", requireAdmin, async (req, res) => {
   res.json(result);
 });
 
-app.post("/api/admin/orders/:id/upstream-note", requireAdmin, async (req, res) => {
+app.post("/api/admin/orders/:id/upstream-note", requireSuperAdmin, async (req, res) => {
   try {
     const orders = await readOrders();
     const order = orders.find((item) => item.id === req.params.id);
@@ -272,7 +302,7 @@ app.post("/api/admin/orders/:id/upstream-note", requireAdmin, async (req, res) =
   }
 });
 
-app.post("/api/admin/orders/:id/upstream-complete", requireAdmin, async (req, res) => {
+app.post("/api/admin/orders/:id/upstream-complete", requireSuperAdmin, async (req, res) => {
   try {
     const orders = await readOrders();
     const order = orders.find((item) => item.id === req.params.id);
@@ -317,9 +347,13 @@ app.post("/api/staff/login", async (req, res) => {
     res.status(401).json({ message: "账号或密码错误" });
     return;
   }
+  if (staff.disabled) {
+    res.status(403).json({ message: "账号已禁用" });
+    return;
+  }
 
   const token = crypto.randomUUID();
-  const safeStaff = { id: staff.id, account: staff.account, name: staff.name, role: staff.role };
+  const safeStaff = { id: staff.id, account: staff.account, name: staff.name, role: staff.role, disabled: staff.disabled };
   staffSessions.set(token, safeStaff);
   persistSessions();
   res.json({ token, staff: safeStaff });

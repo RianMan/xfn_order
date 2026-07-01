@@ -27,9 +27,10 @@ const ROLE_OPTIONS = [
   { value: "operator", label: "操作员" },
   { value: "admin", label: "admin" }
 ];
+const storedAdminUser = localStorage.getItem("adminUser");
 
 const login = reactive({ username: "", password: "" });
-const staffForm = reactive({ account: "", name: "", password: "", role: "operator" });
+const staffForm = reactive({ account: "", name: "", password: "", role: "operator", disabled: false });
 const importParams = reactive({
   p: "1",
   fenyei: "10",
@@ -43,10 +44,12 @@ const orders = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
 const dashboardLoading = ref(false);
+const globalLoadingText = ref("");
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
 const activeTab = ref("orders");
 const dashboardData = ref(null);
 const activeTrendIndex = ref(null);
+const currentAdmin = ref(storedAdminUser ? JSON.parse(storedAdminUser) : (localStorage.getItem("adminToken") ? { role: "admin" } : null));
 const filters = reactive({
   keyword: "",
   discussionKeyword: "",
@@ -73,8 +76,11 @@ const staffEditModal = reactive({
   account: "",
   name: "",
   password: "",
-  role: "operator"
+  role: "operator",
+  disabled: false
 });
+
+const isSuperAdmin = computed(() => currentAdmin.value?.role === "admin");
 
 function authHeaders() {
   const token = localStorage.getItem("adminToken");
@@ -239,6 +245,7 @@ const staffColumns = [
   { title: "账号", dataIndex: "account", key: "account" },
   { title: "姓名", dataIndex: "name", key: "name" },
   { title: "权限", key: "role" },
+  { title: "状态", key: "disabled" },
   { title: "创建时间", dataIndex: "createdAt", key: "createdAt" },
   { title: "操作", key: "action", width: 120 }
 ];
@@ -370,6 +377,8 @@ async function doLogin() {
       body: JSON.stringify(login)
     });
     localStorage.setItem("adminToken", data.token);
+    localStorage.setItem("adminUser", JSON.stringify(data.user || null));
+    currentAdmin.value = data.user || null;
     loggedIn.value = true;
     if (activeTab.value === "dashboard") await loadDashboard();
     else await loadOrders();
@@ -381,6 +390,8 @@ async function doLogin() {
 
 function logout() {
   localStorage.removeItem("adminToken");
+  localStorage.removeItem("adminUser");
+  currentAdmin.value = null;
   loggedIn.value = false;
   orders.value = [];
   dashboardData.value = null;
@@ -483,6 +494,11 @@ async function loadDashboard() {
 }
 
 async function switchTab(tab) {
+  if (tab === "staff" && !isSuperAdmin.value) {
+    activeTab.value = "orders";
+    await loadOrders();
+    return;
+  }
   activeTab.value = tab;
   if (tab === "dashboard") {
     await loadDashboard();
@@ -526,6 +542,7 @@ async function createStaffAccount() {
     staffForm.name = "";
     staffForm.password = "";
     staffForm.role = "operator";
+    staffForm.disabled = false;
     antMessage.success("员工已添加");
     await loadStaffList();
   } catch (err) {
@@ -538,6 +555,7 @@ function openStaffEditModal(record) {
   staffEditModal.account = record.account;
   staffEditModal.name = record.name;
   staffEditModal.role = record.role || "operator";
+  staffEditModal.disabled = Boolean(record.disabled);
   staffEditModal.password = "";
   staffEditModal.open = true;
 }
@@ -552,6 +570,7 @@ async function submitStaffEdit() {
         account: staffEditModal.account,
         name: staffEditModal.name,
         role: staffEditModal.role,
+        disabled: staffEditModal.disabled,
         password: staffEditModal.password
       })
     });
@@ -568,6 +587,7 @@ async function submitStaffEdit() {
 
 async function syncOrders() {
   loading.value = true;
+  globalLoadingText.value = "正在同步第三方订单，请稍候";
   try {
     const data = await request("/api/admin/import", {
       method: "POST",
@@ -581,6 +601,7 @@ async function syncOrders() {
     antMessage.error(err.message);
   } finally {
     loading.value = false;
+    globalLoadingText.value = "";
   }
 }
 
@@ -619,6 +640,7 @@ async function completeUpstream(record) {
   const confirmed = window.confirm(`确认把订单 ${record.orderNumber} 标记为已完结吗？`);
   if (!confirmed) return;
 
+  globalLoadingText.value = "正在完结订单并同步远程数据，请稍候";
   try {
     const data = await request(`/api/admin/orders/${record.id}/upstream-complete`, {
       method: "POST",
@@ -630,6 +652,8 @@ async function completeUpstream(record) {
     await loadOrders();
   } catch (err) {
     antMessage.error(err.message || "完结失败");
+  } finally {
+    globalLoadingText.value = "";
   }
 }
 
@@ -849,6 +873,13 @@ if (activeTab.value === "dashboard") loadDashboard();
   </main>
 
   <main v-else class="admin-page">
+    <div v-if="globalLoadingText" class="global-loading-mask">
+      <div class="global-loading-card">
+        <i></i>
+        <span>{{ globalLoadingText }}</span>
+      </div>
+    </div>
+
     <header class="top-nav">
       <div class="brand">
         <strong>售后工单</strong>
@@ -858,7 +889,7 @@ if (activeTab.value === "dashboard") loadDashboard();
         <button :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">订单台账</button>
         <button :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
         <button :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史订单</button>
-        <button :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号管理</button>
+        <button v-if="isSuperAdmin" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号管理</button>
       </nav>
       <Space>
         <Button :loading="activeTab === 'dashboard' ? dashboardLoading : tableLoading" @click="activeTab === 'dashboard' ? loadDashboard() : loadOrders()">刷新</Button>
@@ -1338,8 +1369,8 @@ if (activeTab.value === "dashboard") loadDashboard();
               <Space direction="vertical" size="small">
                 <Button type="primary" size="small" @click="saveOrder(record)">{{ activeTab === "history" ? "保存薪资" : "保存" }}</Button>
                 <Button v-if="activeTab === 'history'" size="small" @click="restoreToLedger(record)">移回台账</Button>
-                <Button v-if="activeTab !== 'history'" size="small" @click="openAnnotateModal(record)">标注</Button>
-                <Button v-if="activeTab !== 'history'" danger size="small" @click="completeUpstream(record)">已完结</Button>
+                <Button v-if="activeTab !== 'history' && isSuperAdmin" size="small" @click="openAnnotateModal(record)">标注</Button>
+                <Button v-if="activeTab !== 'history' && isSuperAdmin" danger size="small" @click="completeUpstream(record)">已完结</Button>
                 <span class="time-line">完结：{{ formatDiscussionTime(record.completedAt) || "-" }}</span>
               </Space>
             </template>
@@ -1362,13 +1393,21 @@ if (activeTab.value === "dashboard") loadDashboard();
     <section v-else class="admin-content">
       <Card title="添加账号" class="admin-staff-form">
         <Row :gutter="12" align="bottom">
-          <Col :span="5"><Form.Item label="账号"><Input v-model:value="staffForm.account" placeholder="登录账号" /></Form.Item></Col>
-          <Col :span="5"><Form.Item label="姓名"><Input v-model:value="staffForm.name" placeholder="员工姓名" /></Form.Item></Col>
-          <Col :span="5"><Form.Item label="密码"><Input.Password v-model:value="staffForm.password" placeholder="登录密码" /></Form.Item></Col>
-          <Col :span="5">
+          <Col :span="4"><Form.Item label="账号"><Input v-model:value="staffForm.account" placeholder="登录账号" /></Form.Item></Col>
+          <Col :span="4"><Form.Item label="姓名"><Input v-model:value="staffForm.name" placeholder="员工姓名" /></Form.Item></Col>
+          <Col :span="4"><Form.Item label="密码"><Input.Password v-model:value="staffForm.password" placeholder="登录密码" /></Form.Item></Col>
+          <Col :span="4">
             <Form.Item label="权限">
               <Select v-model:value="staffForm.role">
                 <Select.Option v-for="item in ROLE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col :span="4">
+            <Form.Item label="状态">
+              <Select v-model:value="staffForm.disabled">
+                <Select.Option :value="false">启用</Select.Option>
+                <Select.Option :value="true">禁用</Select.Option>
               </Select>
             </Form.Item>
           </Col>
@@ -1381,6 +1420,9 @@ if (activeTab.value === "dashboard") loadDashboard();
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'role'">
               <Tag :color="record.role === 'admin' ? 'blue' : 'default'">{{ roleLabel(record.role) }}</Tag>
+            </template>
+            <template v-else-if="column.key === 'disabled'">
+              <Tag :color="record.disabled ? 'red' : 'green'">{{ record.disabled ? "禁用" : "启用" }}</Tag>
             </template>
             <template v-if="column.key === 'action'">
               <Button size="small" @click="openStaffEditModal(record)">编辑</Button>
@@ -1404,6 +1446,10 @@ if (activeTab.value === "dashboard") loadDashboard();
       <Input v-model:value="staffEditModal.name" placeholder="员工姓名" />
       <Select v-model:value="staffEditModal.role" placeholder="选择权限">
         <Select.Option v-for="item in ROLE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</Select.Option>
+      </Select>
+      <Select v-model:value="staffEditModal.disabled" placeholder="账号状态">
+        <Select.Option :value="false">启用</Select.Option>
+        <Select.Option :value="true">禁用</Select.Option>
       </Select>
       <Input.Password v-model:value="staffEditModal.password" placeholder="新密码，留空则不修改" />
     </Space>
