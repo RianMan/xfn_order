@@ -494,6 +494,11 @@ async function loadDashboard() {
 }
 
 async function switchTab(tab) {
+  if (tab === "dashboard" && !isSuperAdmin.value) {
+    activeTab.value = "orders";
+    await loadOrders();
+    return;
+  }
   if (tab === "staff" && !isSuperAdmin.value) {
     activeTab.value = "orders";
     await loadOrders();
@@ -913,7 +918,7 @@ if (activeTab.value === "dashboard") loadDashboard();
       </div>
       <nav class="top-menu">
         <button :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">订单台账</button>
-        <button :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
+        <button v-if="isSuperAdmin" :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
         <button :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史订单</button>
         <button v-if="isSuperAdmin" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号管理</button>
       </nav>

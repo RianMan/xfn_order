@@ -204,7 +204,7 @@ app.get("/api/admin/orders", requireAdmin, async (req, res) => {
   res.json({ orders: await readAdminOrders(req.query.scope || "active") });
 });
 
-app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+app.get("/api/admin/dashboard", requireSuperAdmin, async (req, res) => {
   const days = Number(req.query.days || 14);
   res.json(await readDashboardMetrics(Number.isFinite(days) ? days : 14));
 });
