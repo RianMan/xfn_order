@@ -273,7 +273,7 @@ export async function readDashboardMetrics(days = 14) {
 
     if (isPaidOrder(order)) {
       paid += 1;
-      const amount = numericAmount(order.commissionAmount, DEFAULT_COMMISSION_AMOUNT);
+      const amount = numericAmount(order.recoveryAmount, 0);
       paymentAmount += amount;
       const paidDate = dateKey(order.completedAt || order.updatedAt);
       if (trendMap.has(paidDate)) {

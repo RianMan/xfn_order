@@ -49,6 +49,7 @@ const dashboardData = ref(null);
 const activeTrendIndex = ref(null);
 const filters = reactive({
   keyword: "",
+  discussionKeyword: "",
   processStatus: undefined,
   assigneeAccount: undefined,
   difficulty: undefined,
@@ -166,6 +167,7 @@ function dateOnly(value) {
 
 const filteredOrders = computed(() => {
   const keyword = filters.keyword.trim();
+  const discussionKeyword = filters.discussionKeyword.trim().toLowerCase();
   return orders.value.filter((order) => {
     const statusOk = !filters.processStatus || order.processStatus === filters.processStatus;
     const assigneeOk =
@@ -186,7 +188,14 @@ const filteredOrders = computed(() => {
       [order.orderNumber, order.shopName, order.maskedShopName, ...(order.phones || [])]
         .filter(Boolean)
         .some((value) => String(value).includes(keyword));
-    return statusOk && assigneeOk && difficultyOk && returnAddressOk && paymentScreenshotDateOk && completedDateOk && keywordOk;
+    const discussionOk =
+      !discussionKeyword ||
+      (order.discussion || []).some((item) =>
+        [item.authorName, item.content]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(discussionKeyword))
+      );
+    return statusOk && assigneeOk && difficultyOk && returnAddressOk && paymentScreenshotDateOk && completedDateOk && keywordOk && discussionOk;
   });
 });
 
@@ -806,6 +815,7 @@ function copy(value) {
 
 function resetFilters() {
   filters.keyword = "";
+  filters.discussionKeyword = "";
   filters.processStatus = undefined;
   filters.assigneeAccount = undefined;
   filters.difficulty = undefined;
@@ -1094,6 +1104,15 @@ if (activeTab.value === "dashboard") loadDashboard();
               allow-clear
               placeholder="搜索订单号 / 店铺 / 手机号"
               style="width: 320px"
+              @change="pager.current = 1"
+              @search="pager.current = 1"
+            />
+            <Input.Search
+              v-model:value="filters.discussionKeyword"
+              allow-clear
+              placeholder="搜索工单对话"
+              style="width: 220px"
+              @change="pager.current = 1"
               @search="pager.current = 1"
             />
             <Select
