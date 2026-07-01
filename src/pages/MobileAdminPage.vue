@@ -271,13 +271,39 @@ async function syncOrders() {
   }
 }
 
-function updateAssignee(record, account) {
+async function updateAssignee(record, account) {
+  if (!record || !isSuperAdmin.value) return;
+  const previous = {
+    assigneeAccount: record.assigneeAccount || "",
+    assigneeName: record.assigneeName || "",
+    handler: record.handler || "",
+    claimedAt: record.claimedAt || ""
+  };
   const cleanAccount = account || "";
   const staff = staffList.value.find((item) => item.account === cleanAccount);
   record.assigneeAccount = cleanAccount;
   record.assigneeName = staff?.name || "";
   record.handler = staff?.name || "";
   record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        assigneeAccount: record.assigneeAccount,
+        assigneeName: record.assigneeName,
+        handler: record.handler,
+        claimedAt: record.claimedAt
+      })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    showNotice("处理人已保存");
+    await loadOrders();
+  } catch (err) {
+    Object.assign(record, previous);
+    showNotice(err.message || "处理人保存失败");
+  }
 }
 
 async function saveOrder(record) {
@@ -689,10 +715,11 @@ loadOrders();
                   </select>
                 </label>
                 <label>处理人
-                  <select :value="record.assigneeAccount || ''" @change="event => updateAssignee(record, event.target.value)">
+                  <select v-if="isSuperAdmin" :value="record.assigneeAccount || ''" @change="event => updateAssignee(record, event.target.value)">
                     <option value="">公共池</option>
                     <option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</option>
                   </select>
+                  <b v-else>{{ record.assigneeName || record.handler || "公共池" }}</b>
                 </label>
               </div>
               <div class="m-admin-two-col">

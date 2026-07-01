@@ -1,7 +1,7 @@
 export const ADDRESS_OPTIONS = ["厂家", "潜山"];
 export const SHIPPED_OPTIONS = ["未寄出", "已寄出"];
 export const PROCESS_OPTIONS = ["未处理", "无法处理", "已约上门取件", "已回款", "联系中", "加好友中", "加不到拍手"];
-export const RECYCLER_OPTIONS = ["红狐狸", "蓝女孩", "奥莉"];
+export const RECYCLER_OPTIONS = ["红狐狸", "蓝女孩", "奥莉", "拼多多"];
 
 export const SYNC_STOP_TEXT = {
   empty_page: "空页停止",

@@ -255,7 +255,15 @@ app.post("/api/admin/upload", requireAdmin, async (req, res) => {
 });
 
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
-  const order = await updateOrder(req.params.id, req.body ?? {});
+  const patch = { ...(req.body ?? {}) };
+  if (req.admin.role !== "admin") {
+    delete patch.assigneeAccount;
+    delete patch.assigneeName;
+    delete patch.handler;
+    delete patch.claimedAt;
+  }
+
+  const order = await updateOrder(req.params.id, patch);
   if (!order) {
     res.status(404).json({ message: "订单不存在" });
     return;

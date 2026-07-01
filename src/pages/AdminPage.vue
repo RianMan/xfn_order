@@ -680,13 +680,39 @@ async function restoreToLedger(record) {
   }
 }
 
-function updateAssignee(record, account) {
+async function updateAssignee(record, account) {
+  if (!record || !isSuperAdmin.value) return;
+  const previous = {
+    assigneeAccount: record.assigneeAccount || "",
+    assigneeName: record.assigneeName || "",
+    handler: record.handler || "",
+    claimedAt: record.claimedAt || ""
+  };
   const cleanAccount = account || "";
   const staff = staffList.value.find((item) => item.account === cleanAccount);
   record.assigneeAccount = cleanAccount;
   record.assigneeName = staff?.name || "";
   record.handler = staff?.name || "";
   record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
+
+  try {
+    const data = await request(`/api/admin/orders/${record.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        assigneeAccount: record.assigneeAccount,
+        assigneeName: record.assigneeName,
+        handler: record.handler,
+        claimedAt: record.claimedAt
+      })
+    });
+    const index = orders.value.findIndex((item) => item.id === data.order.id);
+    if (index >= 0) orders.value[index] = data.order;
+    antMessage.success("处理人已保存");
+    await loadOrders();
+  } catch (err) {
+    Object.assign(record, previous);
+    antMessage.error(err.message || "处理人保存失败");
+  }
 }
 
 function updateOptionalField(record, field, value) {
@@ -1280,6 +1306,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                   <Select.Option v-for="item in PROCESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
                 </Select>
                 <Select
+                  v-if="isSuperAdmin"
                   :value="record.assigneeAccount || undefined"
                   allow-clear
                   placeholder="公共池"
@@ -1288,6 +1315,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                 >
                   <Select.Option v-for="staff in staffList" :key="staff.account" :value="staff.account">{{ staff.name }}</Select.Option>
                 </Select>
+                <Tag v-else>{{ record.assigneeName || record.handler || "公共池" }}</Tag>
               </Space>
             </template>
 
