@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
+import { normalizeImageFile } from "../imageUpload.js";
 
 const WAGE_OPTIONS = ["待发放", "已发放"];
 const ROLE_OPTIONS = [
@@ -383,8 +384,9 @@ async function restoreToLedger(record) {
 
 async function uploadScreenshot(record, field, file) {
   try {
+    const uploadFile = await normalizeImageFile(file);
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", uploadFile);
     const response = await fetch("/api/admin/upload", {
       method: "POST",
       headers: authHeaders(),
@@ -766,7 +768,7 @@ loadOrders();
                   </a>
                   <label class="m-admin-upload">
                     上传
-                    <input type="file" accept="image/*" @change="event => handleNativeUpload(event, record, 'paymentScreenshots')" />
+                    <input type="file" accept="image/*,.heic,.heif" @change="event => handleNativeUpload(event, record, 'paymentScreenshots')" />
                   </label>
                 </div>
               </div>
@@ -779,7 +781,7 @@ loadOrders();
                   </a>
                   <label class="m-admin-upload">
                     上传
-                    <input type="file" accept="image/*" @change="event => handleNativeUpload(event, record, 'otherScreenshots')" />
+                    <input type="file" accept="image/*,.heic,.heif" @change="event => handleNativeUpload(event, record, 'otherScreenshots')" />
                   </label>
                 </div>
               </div>

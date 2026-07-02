@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
 import { PROCESS_OPTIONS, RECYCLER_OPTIONS } from "../constants.js";
+import { normalizeImageFile } from "../imageUpload.js";
 
 const staffLogin = reactive({ account: "", password: "" });
 const staffFilters = reactive({ processStatus: "", refundInfo: "", orderNumber: "" });
@@ -381,8 +382,9 @@ async function uploadStaffScreenshot(record, field, file) {
   }
 
   try {
+    const uploadFile = await normalizeImageFile(file);
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", uploadFile);
     const response = await fetch("/api/staff/upload", {
       method: "POST",
       headers: staffHeaders(),
@@ -729,7 +731,7 @@ if (staffLoggedIn.value) loadStaffOrders();
                   </a>
                   <label class="staff-upload-btn">
                     上传
-                    <input type="file" accept="image/*" @change="event => handleStaffFileChange(event, order, 'paymentScreenshots')" />
+                    <input type="file" accept="image/*,.heic,.heif" @change="event => handleStaffFileChange(event, order, 'paymentScreenshots')" />
                   </label>
                 </div>
               </div>

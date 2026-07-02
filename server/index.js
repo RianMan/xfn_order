@@ -36,7 +36,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter(_req, file, cb) {
-    if (!file.mimetype.startsWith("image/")) cb(new Error("只允许上传图片"));
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const isImageType = String(file.mimetype || "").startsWith("image/");
+    const isImageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"].includes(ext);
+    if (!isImageType && !isImageExt) cb(new Error("只允许上传图片"));
     else cb(null, true);
   }
 });
@@ -168,7 +171,7 @@ async function handleImageUpload(req, res, folder) {
       return;
     }
 
-    const url = await uploadBuffer(req.file.buffer, req.file.originalname, folder);
+    const url = await uploadBuffer(req.file.buffer, req.file.originalname, folder, req.file.mimetype);
     res.json({ url });
   } catch (err) {
     const message = err?.code === "LIMIT_FILE_SIZE"

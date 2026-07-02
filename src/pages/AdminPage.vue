@@ -20,6 +20,7 @@ import {
 } from "ant-design-vue";
 import { CloudSyncOutlined, LogoutOutlined, UploadOutlined } from "@ant-design/icons-vue";
 import { ADDRESS_OPTIONS, PROCESS_OPTIONS, RECYCLER_OPTIONS, SHIPPED_OPTIONS, SYNC_STOP_TEXT } from "../constants.js";
+import { normalizeImageFile } from "../imageUpload.js";
 
 const { TextArea } = Input;
 const WAGE_OPTIONS = ["待发放", "已发放"];
@@ -781,8 +782,9 @@ async function saveOrder(record) {
 
 async function uploadScreenshot(record, field, file) {
   try {
+    const uploadFile = await normalizeImageFile(file);
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", uploadFile);
     const response = await fetch("/api/admin/upload", {
       method: "POST",
       headers: authHeaders(),
@@ -1351,7 +1353,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                     <Image :src="url" :width="52" :height="52" />
                     <button @click="removeScreenshot(record, 'paymentScreenshots', url)">移除</button>
                   </div>
-                  <Upload :before-upload="file => uploadScreenshot(record, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*">
+                  <Upload :before-upload="file => uploadScreenshot(record, 'paymentScreenshots', file)" :show-upload-list="false" accept="image/*,.heic,.heif">
                     <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
                   </Upload>
                 </div>
@@ -1365,7 +1367,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                   <Image :src="url" :width="52" :height="52" />
                   <button @click="removeScreenshot(record, 'otherScreenshots', url)">移除</button>
                 </div>
-                <Upload :before-upload="file => uploadScreenshot(record, 'otherScreenshots', file)" :show-upload-list="false" accept="image/*">
+                <Upload :before-upload="file => uploadScreenshot(record, 'otherScreenshots', file)" :show-upload-list="false" accept="image/*,.heic,.heif">
                   <Button size="small"><template #icon><UploadOutlined /></template>上传</Button>
                 </Upload>
               </div>

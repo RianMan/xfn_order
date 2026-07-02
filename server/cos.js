@@ -27,7 +27,22 @@ function dateKey() {
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 }
 
-export async function uploadBuffer(buffer, originalName, folder = "after-sales/screenshots") {
+function contentTypeByExt(originalName, fallback = "") {
+  const ext = path.extname(originalName).toLowerCase();
+  const cleanFallback = String(fallback || "");
+  const map = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif"
+  };
+  return cleanFallback.startsWith("image/") ? cleanFallback : (map[ext] || "application/octet-stream");
+}
+
+export async function uploadBuffer(buffer, originalName, folder = "after-sales/screenshots", contentType = "") {
   const ext = path.extname(originalName) || ".jpg";
   const key = `${folder}/${dateKey()}/${crypto.randomBytes(8).toString("hex")}${ext}`;
 
@@ -42,7 +57,8 @@ export async function uploadBuffer(buffer, originalName, folder = "after-sales/s
         Region: REGION,
         Key: key,
         Body: buffer,
-        ContentLength: buffer.length
+        ContentLength: buffer.length,
+        ContentType: contentTypeByExt(originalName, contentType)
       },
       (err) => {
         if (err) reject(err);
