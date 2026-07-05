@@ -257,6 +257,36 @@ app.post("/api/admin/upload", requireAdmin, async (req, res) => {
   await handleImageUpload(req, res, "after-sales/screenshots");
 });
 
+app.patch("/api/admin/orders/batch-wage-status", requireAdmin, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? Array.from(new Set(req.body.ids.map((id) => String(id)))) : [];
+  const wageStatus = String(req.body?.wageStatus || "").trim();
+
+  if (!ids.length) {
+    res.status(400).json({ message: "请选择要处理的订单" });
+    return;
+  }
+  if (!["待发放", "已发放"].includes(wageStatus)) {
+    res.status(400).json({ message: "工资状态不正确" });
+    return;
+  }
+
+  const idSet = new Set(ids);
+  const existingOrders = await readOrders();
+  const targetIds = existingOrders
+    .filter((order) => {
+      const currentWageStatus = order.wageStatus === "工资已结" ? "已发放" : order.wageStatus || "待发放";
+      return idSet.has(order.id) && order.status === "completed" && currentWageStatus !== "已发放";
+    })
+    .map((order) => order.id);
+  const updated = [];
+  for (const id of targetIds) {
+    const order = await updateOrder(id, { wageStatus });
+    if (order) updated.push(order);
+  }
+
+  res.json({ orders: updated, updated: updated.length });
+});
+
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
   const patch = { ...(req.body ?? {}) };
   if (req.admin.role !== "admin") {

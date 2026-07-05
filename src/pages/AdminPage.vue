@@ -64,6 +64,7 @@ const filters = reactive({
 const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
+const selectedPayrollOrderIds = ref([]);
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -209,6 +210,27 @@ const filteredOrders = computed(() => {
 const pagedOrders = computed(() => {
   const start = (pager.current - 1) * pager.pageSize;
   return filteredOrders.value.slice(start, start + pager.pageSize);
+});
+
+const pendingSelectedPayrollOrderIds = computed(() => {
+  const selected = new Set(selectedPayrollOrderIds.value);
+  return orders.value
+    .filter((order) => selected.has(order.id) && order.status === "completed" && payrollStatus(order.wageStatus) !== "已发放")
+    .map((order) => order.id);
+});
+
+const payrollRowSelection = computed(() => {
+  if (activeTab.value !== "history") return undefined;
+  return {
+    selectedRowKeys: selectedPayrollOrderIds.value,
+    onChange: (keys) => {
+      selectedPayrollOrderIds.value = keys;
+    },
+    getCheckboxProps: (record) => ({
+      disabled: record.status !== "completed" || payrollStatus(record.wageStatus) === "已发放",
+      name: record.orderNumber
+    })
+  };
 });
 
 const baseColumns = [
@@ -480,6 +502,38 @@ function exportPendingPayroll() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+async function markSelectedPayrollPaid() {
+  const ids = pendingSelectedPayrollOrderIds.value;
+  if (!ids.length) {
+    antMessage.warning("请选择待发放的薪资订单");
+    return;
+  }
+  const confirmed = window.confirm(`确认将选中的 ${ids.length} 条薪资标记为已发放吗？`);
+  if (!confirmed) return;
+
+  tableLoading.value = true;
+  try {
+    const data = await request("/api/admin/orders/batch-wage-status", {
+      method: "PATCH",
+      body: JSON.stringify({
+        ids,
+        wageStatus: "已发放"
+      })
+    });
+    for (const updatedOrder of data.orders || []) {
+      const index = orders.value.findIndex((item) => item.id === updatedOrder.id);
+      if (index >= 0) orders.value[index] = updatedOrder;
+    }
+    const updatedIds = new Set((data.orders || []).map((item) => item.id));
+    selectedPayrollOrderIds.value = selectedPayrollOrderIds.value.filter((id) => !updatedIds.has(id));
+    antMessage.success(`已标记 ${data.updated || 0} 条薪资为已发放`);
+  } catch (err) {
+    antMessage.error(err.message || "批量发放失败");
+  } finally {
+    tableLoading.value = false;
+  }
 }
 
 async function loadDashboard() {
@@ -1236,6 +1290,13 @@ if (activeTab.value === "dashboard") loadDashboard();
               />
             </label>
             <Button v-if="activeTab === 'history'" type="primary" @click="exportPendingPayroll">导出待发放薪资表</Button>
+            <Button
+              v-if="activeTab === 'history'"
+              :disabled="!pendingSelectedPayrollOrderIds.length"
+              @click="markSelectedPayrollPaid"
+            >
+              批量已发放 {{ pendingSelectedPayrollOrderIds.length ? `(${pendingSelectedPayrollOrderIds.length})` : "" }}
+            </Button>
             <Button @click="resetFilters">重置</Button>
           </Space>
         </template>
@@ -1246,6 +1307,7 @@ if (activeTab.value === "dashboard") loadDashboard();
           :data-source="pagedOrders"
           :loading="tableLoading"
           :pagination="false"
+          :row-selection="payrollRowSelection"
           row-key="id"
           size="middle"
           bordered
