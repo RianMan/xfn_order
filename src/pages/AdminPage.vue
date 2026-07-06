@@ -241,6 +241,7 @@ const baseColumns = [
   { title: "退货单号", key: "returnTrackingNo", width: 180 },
   { title: "退货地址", key: "returnAddress", width: 120 },
   { title: "处理", key: "process", width: 220 },
+  { title: "工资金额", key: "commission", width: 120 },
   { title: "金额", key: "amounts", width: 180 },
   { title: "备注", key: "remark", width: 220 },
   { title: "收款截图", key: "paymentScreenshots", width: 180 },
@@ -250,7 +251,6 @@ const baseColumns = [
 ];
 
 const historyColumns = [
-  { title: "佣金", key: "commission", width: 120 },
   { title: "工资状态", key: "wageStatus", width: 140 }
 ];
 
@@ -478,7 +478,7 @@ function exportPendingPayroll() {
   }
 
   const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.account.localeCompare(b.account));
-  const headers = ["员工账号", "员工姓名", "待发放订单数", "回收金额合计", "售后佣金合计", "后台佣金合计", "回收人", "订单号列表", "完结日期"];
+  const headers = ["员工账号", "员工姓名", "待发放订单数", "回收金额合计", "售后佣金合计", "工资金额合计", "回收人", "订单号列表", "完结日期"];
   const lines = [
     headers.map(csvCell).join(","),
     ...summaryRows.map((item) => [
@@ -1311,7 +1311,8 @@ if (activeTab.value === "dashboard") loadDashboard();
           row-key="id"
           size="middle"
           bordered
-          :scroll="{ x: 2340 }"
+          :scroll="{ x: 2460 }"
+          :sticky="{ offsetHeader: 0, offsetScroll: 0 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'order'">
@@ -1436,7 +1437,7 @@ if (activeTab.value === "dashboard") loadDashboard();
             </template>
 
             <template v-else-if="column.key === 'commission'">
-              <Input v-model:value="record.commissionAmount" type="number" min="0" step="0.01" placeholder="佣金" />
+              <Input v-model:value="record.commissionAmount" type="number" min="0" step="0.01" placeholder="工资金额" />
             </template>
 
             <template v-else-if="column.key === 'wageStatus'">
