@@ -8,6 +8,7 @@ import { uploadBuffer } from "./cos.js";
 import { fetchThirdPartyOrderPages } from "./importer.js";
 import { queryUpstreamOrder } from "./orderQuery.js";
 import { parseAfterSalesOrders } from "./parser.js";
+import { createReplacementOrder, readReplacementOrders } from "./replacementOrderStore.js";
 import {
   addAdminDiscussion,
   addStaffDiscussion,
@@ -210,6 +211,19 @@ app.get("/api/admin/orders", requireAdmin, async (req, res) => {
 app.get("/api/admin/dashboard", requireSuperAdmin, async (req, res) => {
   const days = Number(req.query.days || 14);
   res.json(await readDashboardMetrics(Number.isFinite(days) ? days : 14));
+});
+
+app.get("/api/admin/replacement-orders", requireSuperAdmin, async (req, res) => {
+  res.json({ orders: await readReplacementOrders(req.query.keyword || "") });
+});
+
+app.post("/api/admin/replacement-orders", requireSuperAdmin, async (req, res) => {
+  try {
+    const order = await createReplacementOrder(req.body ?? {});
+    res.json({ order });
+  } catch (err) {
+    res.status(400).json({ message: err.message || "新增换人订单失败" });
+  }
 });
 
 app.get("/api/admin/staff", requireAdmin, async (_req, res) => {

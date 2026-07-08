@@ -120,6 +120,21 @@ export function getDb() {
       disabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS replacement_orders (
+      id TEXT PRIMARY KEY,
+      order_number TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      result TEXT NOT NULL DEFAULT '',
+      replaced_order TEXT NOT NULL DEFAULT '',
+      handler TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_replacement_orders_order_number ON replacement_orders(order_number);
+    CREATE INDEX IF NOT EXISTS idx_replacement_orders_handler ON replacement_orders(handler);
+    CREATE INDEX IF NOT EXISTS idx_replacement_orders_created_at ON replacement_orders(created_at);
   `);
 
   ensureStaffRoleColumn(db);

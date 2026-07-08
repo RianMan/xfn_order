@@ -42,8 +42,10 @@ const importParams = reactive({
 });
 
 const orders = ref([]);
+const replacementOrders = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
+const replacementLoading = ref(false);
 const dashboardLoading = ref(false);
 const globalLoadingText = ref("");
 const loggedIn = ref(Boolean(localStorage.getItem("adminToken")));
@@ -65,6 +67,16 @@ const pager = reactive({ current: 1, pageSize: 10 });
 const staffList = ref([]);
 const discussionDrafts = reactive({});
 const selectedPayrollOrderIds = ref([]);
+const replacementKeyword = ref("");
+const replacementModal = reactive({
+  open: false,
+  loading: false,
+  orderNumber: "",
+  reason: "",
+  result: "",
+  replacedOrder: "",
+  handler: ""
+});
 const annotateModal = reactive({
   open: false,
   loading: false,
@@ -146,6 +158,12 @@ const pageMeta = computed(() => {
     return {
       title: "历史订单",
       subtitle: "已完结订单，维护佣金和工资发放状态"
+    };
+  }
+  if (activeTab.value === "replacement") {
+    return {
+      title: "换人订单",
+      subtitle: "记录换人订单原因、处理结果和替换关系"
     };
   }
   return {
@@ -271,6 +289,15 @@ const staffColumns = [
   { title: "状态", key: "disabled" },
   { title: "创建时间", dataIndex: "createdAt", key: "createdAt" },
   { title: "操作", key: "action", width: 120 }
+];
+
+const replacementColumns = [
+  { title: "订单号", dataIndex: "orderNumber", key: "orderNumber", width: 180 },
+  { title: "原因", dataIndex: "reason", key: "reason", width: 260 },
+  { title: "处理结果", dataIndex: "result", key: "result", width: 260 },
+  { title: "被替换的订单", dataIndex: "replacedOrder", key: "replacedOrder", width: 180 },
+  { title: "处理人", dataIndex: "handler", key: "handler", width: 140 },
+  { title: "创建时间", key: "createdAt", width: 180 }
 ];
 
 function niceMax(value) {
@@ -417,6 +444,7 @@ function logout() {
   currentAdmin.value = null;
   loggedIn.value = false;
   orders.value = [];
+  replacementOrders.value = [];
   dashboardData.value = null;
 }
 
@@ -549,12 +577,7 @@ async function loadDashboard() {
 }
 
 async function switchTab(tab) {
-  if (tab === "dashboard" && !isSuperAdmin.value) {
-    activeTab.value = "orders";
-    await loadOrders();
-    return;
-  }
-  if (tab === "staff" && !isSuperAdmin.value) {
+  if (["dashboard", "staff", "replacement"].includes(tab) && !isSuperAdmin.value) {
     activeTab.value = "orders";
     await loadOrders();
     return;
@@ -562,6 +585,10 @@ async function switchTab(tab) {
   activeTab.value = tab;
   if (tab === "dashboard") {
     await loadDashboard();
+    return;
+  }
+  if (tab === "replacement") {
+    await loadReplacementOrders();
     return;
   }
   if (tab === "staff") {
@@ -590,6 +617,70 @@ async function loadStaffList() {
   if (!loggedIn.value) return;
   const data = await request("/api/admin/staff");
   staffList.value = data.staff;
+}
+
+async function loadReplacementOrders() {
+  if (!loggedIn.value || !isSuperAdmin.value) return;
+  replacementLoading.value = true;
+  try {
+    const query = replacementKeyword.value.trim()
+      ? `?keyword=${encodeURIComponent(replacementKeyword.value.trim())}`
+      : "";
+    const data = await request(`/api/admin/replacement-orders${query}`);
+    replacementOrders.value = data.orders;
+  } catch (err) {
+    antMessage.error(err.message || "换人订单加载失败");
+  } finally {
+    replacementLoading.value = false;
+  }
+}
+
+function openReplacementModal() {
+  replacementModal.orderNumber = "";
+  replacementModal.reason = "";
+  replacementModal.result = "";
+  replacementModal.replacedOrder = "";
+  replacementModal.handler = "";
+  replacementModal.open = true;
+}
+
+async function submitReplacementOrder() {
+  replacementModal.loading = true;
+  try {
+    const data = await request("/api/admin/replacement-orders", {
+      method: "POST",
+      body: JSON.stringify({
+        orderNumber: replacementModal.orderNumber,
+        reason: replacementModal.reason,
+        result: replacementModal.result,
+        replacedOrder: replacementModal.replacedOrder,
+        handler: replacementModal.handler
+      })
+    });
+    replacementOrders.value = [data.order, ...replacementOrders.value];
+    replacementModal.open = false;
+    antMessage.success("换人订单已新增");
+  } catch (err) {
+    antMessage.error(err.message || "新增失败");
+  } finally {
+    replacementModal.loading = false;
+  }
+}
+
+async function refreshActiveTab() {
+  if (activeTab.value === "dashboard") {
+    await loadDashboard();
+    return;
+  }
+  if (activeTab.value === "replacement") {
+    await loadReplacementOrders();
+    return;
+  }
+  if (activeTab.value === "staff") {
+    await loadStaffList();
+    return;
+  }
+  await loadOrders();
 }
 
 async function createStaffAccount() {
@@ -976,10 +1067,11 @@ if (activeTab.value === "dashboard") loadDashboard();
         <button :class="{ active: activeTab === 'orders' }" @click="switchTab('orders')">订单台账</button>
         <button v-if="isSuperAdmin" :class="{ active: activeTab === 'dashboard' }" @click="switchTab('dashboard')">数据大盘</button>
         <button :class="{ active: activeTab === 'history' }" @click="switchTab('history')">历史订单</button>
+        <button v-if="isSuperAdmin" :class="{ active: activeTab === 'replacement' }" @click="switchTab('replacement')">换人订单</button>
         <button v-if="isSuperAdmin" :class="{ active: activeTab === 'staff' }" @click="switchTab('staff')">账号管理</button>
       </nav>
       <Space>
-        <Button :loading="activeTab === 'dashboard' ? dashboardLoading : tableLoading" @click="activeTab === 'dashboard' ? loadDashboard() : loadOrders()">刷新</Button>
+        <Button :loading="activeTab === 'dashboard' ? dashboardLoading : activeTab === 'replacement' ? replacementLoading : tableLoading" @click="refreshActiveTab">刷新</Button>
         <Button @click="logout">
           <template #icon><LogoutOutlined /></template>
           退出
@@ -1488,6 +1580,39 @@ if (activeTab.value === "dashboard") loadDashboard();
       </Card>
     </section>
 
+    <section v-else-if="activeTab === 'replacement'" class="admin-content">
+      <Card class="table-card">
+        <template #title>
+          <Space class="filter-toolbar" wrap :size="[8, 8]">
+            <Input.Search
+              v-model:value="replacementKeyword"
+              allow-clear
+              placeholder="搜索订单号 / 原因 / 处理结果 / 处理人"
+              style="width: 360px"
+              @search="loadReplacementOrders"
+              @change="loadReplacementOrders"
+            />
+            <Button type="primary" @click="openReplacementModal">新增换人订单</Button>
+          </Space>
+        </template>
+        <Table
+          class="desktop-admin-table"
+          :columns="replacementColumns"
+          :data-source="replacementOrders"
+          :loading="replacementLoading"
+          :pagination="{ pageSize: 10 }"
+          row-key="id"
+          bordered
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'createdAt'">
+              {{ formatDiscussionTime(record.createdAt) || "-" }}
+            </template>
+          </template>
+        </Table>
+      </Card>
+    </section>
+
     <section v-else class="admin-content">
       <Card title="添加账号" class="admin-staff-form">
         <Row :gutter="12" align="bottom">
@@ -1530,6 +1655,23 @@ if (activeTab.value === "dashboard") loadDashboard();
       </Card>
     </section>
   </main>
+
+  <Modal
+    v-model:open="replacementModal.open"
+    title="新增换人订单"
+    ok-text="保存"
+    cancel-text="取消"
+    :confirm-loading="replacementModal.loading"
+    @ok="submitReplacementOrder"
+  >
+    <Space direction="vertical" style="width: 100%">
+      <Input v-model:value="replacementModal.orderNumber" placeholder="订单号" />
+      <TextArea v-model:value="replacementModal.reason" :rows="3" placeholder="原因" />
+      <TextArea v-model:value="replacementModal.result" :rows="3" placeholder="处理结果" />
+      <Input v-model:value="replacementModal.replacedOrder" placeholder="被替换的订单" />
+      <Input v-model:value="replacementModal.handler" placeholder="处理人" />
+    </Space>
+  </Modal>
 
   <Modal
     v-model:open="staffEditModal.open"
