@@ -1057,11 +1057,17 @@ body {
 }
 
 .staff-order-form label,
+.staff-readonly-block,
 .claim-preview span,
 .staff-shot-grid span {
   color: #9a704b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.staff-readonly-block {
+  display: grid;
+  gap: 6px;
 }
 
 .claim-preview b {

@@ -641,6 +641,22 @@ if (staffLoggedIn.value) loadStaffOrders();
               </button>
             </div>
             <div><span>退货地址</span><b>{{ order.returnAddress || "未填写" }}</b></div>
+            <label class="staff-readonly-block">已有备注
+              <pre class="staff-remark-log">{{ order.internalRemark || "暂无备注" }}</pre>
+            </label>
+            <div class="discussion-box staff-discussion-box">
+              <strong>工单对话</strong>
+              <div class="discussion-list">
+                <div v-for="item in order.discussion" :key="item.id" class="discussion-item" :class="item.authorType">
+                  <div>
+                    <strong>{{ item.authorName }}</strong>
+                    <span>{{ formatDiscussionTime(item.createdAt) }}</span>
+                  </div>
+                  <p>{{ item.content }}</p>
+                </div>
+                <span v-if="!(order.discussion || []).length" class="discussion-empty">暂无对话</span>
+              </div>
+            </div>
             <button class="staff-primary-btn" @click="claimOrder(order)">领取这个工单</button>
           </div>
 
