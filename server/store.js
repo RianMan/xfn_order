@@ -392,6 +392,28 @@ export async function updateOrder(id, patch) {
   return order;
 }
 
+export async function assignOrderToStaff(id, staff) {
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === id);
+  if (!order) return null;
+
+  if (!staff) {
+    order.assigneeAccount = "";
+    order.assigneeName = "";
+    order.handler = "";
+    order.claimedAt = "";
+  } else {
+    order.assigneeAccount = staff.account;
+    order.assigneeName = staff.name;
+    order.handler = staff.name;
+    order.claimedAt = new Date().toISOString();
+    order.processStatus = order.processStatus === "无法处理" ? "未处理" : (order.processStatus || "未处理");
+  }
+  order.updatedAt = new Date().toISOString();
+  await saveOrders(orders);
+  return order;
+}
+
 function isClaimableOrder(order) {
   if (order.status === "completed" || order.processStatus === "已回款") return false;
   return !order.assigneeAccount || order.processStatus === "无法处理";

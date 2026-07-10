@@ -12,6 +12,7 @@ import { createReplacementOrder, readReplacementOrders } from "./replacementOrde
 import {
   addAdminDiscussion,
   addStaffDiscussion,
+  assignOrderToStaff,
   claimNextOrder,
   claimOrderById,
   dedupeExistingOrders,
@@ -316,6 +317,28 @@ app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     return;
   }
   res.json({ order });
+});
+
+app.patch("/api/admin/orders/:id/assignee", requireSuperAdmin, async (req, res) => {
+  try {
+    const account = String(req.body?.assigneeAccount || "").trim();
+    const staff = account
+      ? (await readStaff()).find((item) => item.account === account && !item.disabled)
+      : null;
+    if (account && !staff) {
+      res.status(400).json({ message: "处理人不存在或已禁用" });
+      return;
+    }
+
+    const order = await assignOrderToStaff(req.params.id, staff);
+    if (!order) {
+      res.status(404).json({ message: "订单不存在" });
+      return;
+    }
+    res.json({ order });
+  } catch (err) {
+    res.status(400).json({ message: err.message || "处理人保存失败" });
+  }
 });
 
 app.post("/api/admin/orders/:id/discussion", requireAdmin, async (req, res) => {

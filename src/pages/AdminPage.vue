@@ -837,23 +837,22 @@ async function updateAssignee(record, account) {
     assigneeAccount: record.assigneeAccount || "",
     assigneeName: record.assigneeName || "",
     handler: record.handler || "",
-    claimedAt: record.claimedAt || ""
+    claimedAt: record.claimedAt || "",
+    processStatus: record.processStatus || ""
   };
   const cleanAccount = account || "";
   const staff = staffList.value.find((item) => item.account === cleanAccount);
   record.assigneeAccount = cleanAccount;
   record.assigneeName = staff?.name || "";
   record.handler = staff?.name || "";
-  record.claimedAt = cleanAccount ? (record.claimedAt || new Date().toISOString()) : "";
+  record.claimedAt = cleanAccount ? new Date().toISOString() : "";
+  if (cleanAccount && record.processStatus === "无法处理") record.processStatus = "未处理";
 
   try {
-    const data = await request(`/api/admin/orders/${record.id}`, {
+    const data = await request(`/api/admin/orders/${record.id}/assignee`, {
       method: "PATCH",
       body: JSON.stringify({
-        assigneeAccount: record.assigneeAccount,
-        assigneeName: record.assigneeName,
-        handler: record.handler,
-        claimedAt: record.claimedAt
+        assigneeAccount: record.assigneeAccount
       })
     });
     const index = orders.value.findIndex((item) => item.id === data.order.id);
