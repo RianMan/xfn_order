@@ -453,9 +453,10 @@ function formatMoney(value) {
 }
 
 function payrollStatus(value) {
-  if (value === "工资待结") return "待发放";
-  if (value === "工资已结") return "已发放";
-  return value || "待发放";
+  const status = String(value || "").trim();
+  if (status === "工资待结") return "待发放";
+  if (status === "工资已结") return "已发放";
+  return status || "待发放";
 }
 
 function roleLabel(role) {
@@ -473,7 +474,9 @@ function numberValue(value) {
 }
 
 function exportPendingPayroll() {
-  const rows = orders.value.filter((order) => order.status === "completed" && payrollStatus(order.wageStatus) !== "已发放");
+  const rows = orders.value.filter(
+    (order) => order.status === "completed" && payrollStatus(order.wageStatus) === "待发放"
+  );
   if (!rows.length) {
     antMessage.warning("暂无待发放薪资可导出");
     return;
