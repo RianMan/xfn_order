@@ -798,7 +798,24 @@ async function completeUpstream(record) {
   try {
     const data = await request(`/api/admin/orders/${record.id}/upstream-complete`, {
       method: "POST",
-      body: "{}"
+      body: JSON.stringify({
+        returnReason: record.returnReason,
+        shipped: record.shipped,
+        returnTrackingNo: record.returnTrackingNo,
+        returnAddress: record.returnAddress,
+        handler: record.handler,
+        assigneeAccount: record.assigneeAccount || "",
+        assigneeName: record.assigneeName || "",
+        claimedAt: record.claimedAt || "",
+        internalRemark: record.internalRemark,
+        paymentScreenshots: record.paymentScreenshots || [],
+        otherScreenshots: record.otherScreenshots || [],
+        recoveryAmount: record.recoveryAmount,
+        afterSalesCommissionAmount: record.afterSalesCommissionAmount,
+        recycler: record.recycler || "",
+        commissionAmount: record.commissionAmount,
+        wageStatus: payrollStatus(record.wageStatus)
+      })
     });
     const index = orders.value.findIndex((item) => item.id === data.order?.id);
     if (index >= 0) orders.value[index] = data.order;

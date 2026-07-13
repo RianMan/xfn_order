@@ -384,6 +384,7 @@ app.post("/api/admin/orders/:id/upstream-complete", requireSuperAdmin, async (re
   try {
     const orders = await readOrders();
     const order = orders.find((item) => item.id === req.params.id);
+    const patch = req.body ?? {};
 
     if (!order) {
       res.status(404).json({ message: "订单不存在" });
@@ -395,11 +396,26 @@ app.post("/api/admin/orders/:id/upstream-complete", requireSuperAdmin, async (re
     }
 
     await completeUpstreamOrder(order.sourceId);
+    const commissionSource = "commissionAmount" in patch ? patch.commissionAmount : order.commissionAmount;
     const updatedOrder = await updateOrder(order.id, {
+      returnReason: "returnReason" in patch ? patch.returnReason : order.returnReason,
+      shipped: "shipped" in patch ? patch.shipped : order.shipped,
+      returnTrackingNo: "returnTrackingNo" in patch ? patch.returnTrackingNo : order.returnTrackingNo,
+      returnAddress: "returnAddress" in patch ? patch.returnAddress : order.returnAddress,
+      handler: "handler" in patch ? patch.handler : order.handler,
+      assigneeAccount: "assigneeAccount" in patch ? patch.assigneeAccount : order.assigneeAccount,
+      assigneeName: "assigneeName" in patch ? patch.assigneeName : order.assigneeName,
+      claimedAt: "claimedAt" in patch ? patch.claimedAt : order.claimedAt,
+      internalRemark: "internalRemark" in patch ? patch.internalRemark : order.internalRemark,
+      paymentScreenshots: "paymentScreenshots" in patch ? patch.paymentScreenshots : order.paymentScreenshots,
+      otherScreenshots: "otherScreenshots" in patch ? patch.otherScreenshots : order.otherScreenshots,
+      recoveryAmount: "recoveryAmount" in patch ? patch.recoveryAmount : order.recoveryAmount,
+      afterSalesCommissionAmount: "afterSalesCommissionAmount" in patch ? patch.afterSalesCommissionAmount : order.afterSalesCommissionAmount,
+      recycler: "recycler" in patch ? patch.recycler : order.recycler,
       processStatus: "已回款",
       status: "completed",
-      wageStatus: "待发放",
-      commissionAmount: Number.isFinite(Number(order.commissionAmount)) ? Number(order.commissionAmount) : 3,
+      wageStatus: patch.wageStatus || "待发放",
+      commissionAmount: Number.isFinite(Number(commissionSource)) ? Number(commissionSource) : 3,
       completedAt: new Date().toISOString()
     });
     const { orders: remoteOrders, pages, stoppedReason } = await fetchThirdPartyOrderPages({});
