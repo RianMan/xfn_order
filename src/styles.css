@@ -353,6 +353,98 @@ body {
   display: flex;
 }
 
+.payroll-summary-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.payroll-summary-total {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.payroll-summary-total span {
+  color: #475569;
+  font-size: 13px;
+}
+
+.payroll-summary-total strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.payroll-summary-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+}
+
+.payroll-summary-item {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1.5fr repeat(5, minmax(82px, 1fr));
+  padding: 10px;
+}
+
+.payroll-summary-item div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.payroll-summary-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.payroll-summary-item strong,
+.payroll-summary-item b {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.payroll-summary-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.desktop-admin-table .wage-status-cell.paid {
+  background: #f0fdf4;
+}
+
+.desktop-admin-table .wage-status-cell.pending {
+  background: #fff7ed;
+}
+
+.wage-status-select.paid .ant-select-selector {
+  background: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #166534;
+}
+
+.wage-status-select.pending .ant-select-selector {
+  background: #ffedd5 !important;
+  border-color: #fdba74 !important;
+  color: #9a3412;
+}
+
+.wage-status-select.paid .ant-select-selection-item,
+.wage-status-select.pending .ant-select-selection-item {
+  font-weight: 700;
+}
+
 .date-filter-field {
   align-items: center;
   background: #f8fafc;

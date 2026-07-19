@@ -24,6 +24,9 @@ import { normalizeImageFile } from "../imageUpload.js";
 
 const { TextArea } = Input;
 const WAGE_OPTIONS = ["待发放", "已发放"];
+const EFFECTIVE_ORDER_COMMISSION_THRESHOLD = 3;
+const BONUS_ORDER_STEP = 6;
+const BONUS_AMOUNT = 10;
 const ROLE_OPTIONS = [
   { value: "operator", label: "操作员" },
   { value: "admin", label: "admin" }
@@ -269,7 +272,14 @@ const baseColumns = [
 ];
 
 const historyColumns = [
-  { title: "工资状态", key: "wageStatus", width: 140 }
+  {
+    title: "工资状态",
+    key: "wageStatus",
+    width: 140,
+    customCell: (record) => ({
+      class: payrollStatus(record.wageStatus) === "已发放" ? "wage-status-cell paid" : "wage-status-cell pending"
+    })
+  }
 ];
 
 const columns = computed(() => {
@@ -473,52 +483,139 @@ function numberValue(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function isEffectivePayrollOrder(order) {
+  return numberValue(order.commissionAmount) >= EFFECTIVE_ORDER_COMMISSION_THRESHOLD;
+}
+
+function payrollStaffKey(order) {
+  return order.assigneeAccount || order.handler || order.assigneeName || "未分配账号";
+}
+
+function createPayrollSummaryItem(order) {
+  const account = payrollStaffKey(order);
+  return {
+    account,
+    name: order.assigneeName || order.handler || "",
+    pendingOrderCount: 0,
+    pendingEffectiveCount: 0,
+    paidEffectiveCount: 0,
+    carryInEffectiveCount: 0,
+    bonusCount: 0,
+    carryOutEffectiveCount: 0,
+    recoveryAmount: 0,
+    afterSalesCommissionAmount: 0,
+    commissionAmount: 0,
+    bonusAmount: 0,
+    payableAmount: 0,
+    recyclers: new Set(),
+    orderNumbers: [],
+    completedDates: []
+  };
+}
+
+const payrollSummaryRows = computed(() => {
+  const summaryMap = new Map();
+  const completedOrders = orders.value.filter((order) => order.status === "completed");
+
+  for (const order of completedOrders) {
+    const status = payrollStatus(order.wageStatus);
+    if (!["待发放", "已发放"].includes(status)) continue;
+    const account = payrollStaffKey(order);
+    const item = summaryMap.get(account) || createPayrollSummaryItem(order);
+
+    item.name = item.name || order.assigneeName || order.handler || "";
+    if (status === "已发放" && isEffectivePayrollOrder(order)) {
+      item.paidEffectiveCount += 1;
+    }
+    if (status === "待发放") {
+      item.pendingOrderCount += 1;
+      if (isEffectivePayrollOrder(order)) item.pendingEffectiveCount += 1;
+      item.recoveryAmount += numberValue(order.recoveryAmount);
+      item.afterSalesCommissionAmount += numberValue(order.afterSalesCommissionAmount);
+      item.commissionAmount += numberValue(order.commissionAmount);
+      if (order.recycler) item.recyclers.add(order.recycler);
+      if (order.orderNumber) item.orderNumbers.push(order.orderNumber);
+      if (order.completedAt) item.completedDates.push(dateOnly(order.completedAt));
+    }
+    summaryMap.set(account, item);
+  }
+
+  return Array.from(summaryMap.values())
+    .filter((item) => item.pendingOrderCount > 0)
+    .map((item) => {
+      const carryInEffectiveCount = item.paidEffectiveCount % BONUS_ORDER_STEP;
+      const bonusCount = Math.floor((carryInEffectiveCount + item.pendingEffectiveCount) / BONUS_ORDER_STEP);
+      const carryOutEffectiveCount = (carryInEffectiveCount + item.pendingEffectiveCount) % BONUS_ORDER_STEP;
+      const bonusAmount = bonusCount * BONUS_AMOUNT;
+      return {
+        ...item,
+        carryInEffectiveCount,
+        bonusCount,
+        carryOutEffectiveCount,
+        bonusAmount,
+        payableAmount: item.commissionAmount + bonusAmount
+      };
+    })
+    .sort((a, b) => a.account.localeCompare(b.account));
+});
+
+const payrollSummaryTotals = computed(() => payrollSummaryRows.value.reduce((total, item) => ({
+  pendingOrderCount: total.pendingOrderCount + item.pendingOrderCount,
+  pendingEffectiveCount: total.pendingEffectiveCount + item.pendingEffectiveCount,
+  bonusCount: total.bonusCount + item.bonusCount,
+  commissionAmount: total.commissionAmount + item.commissionAmount,
+  bonusAmount: total.bonusAmount + item.bonusAmount,
+  payableAmount: total.payableAmount + item.payableAmount
+}), {
+  pendingOrderCount: 0,
+  pendingEffectiveCount: 0,
+  bonusCount: 0,
+  commissionAmount: 0,
+  bonusAmount: 0,
+  payableAmount: 0
+}));
+
 function exportPendingPayroll() {
-  const rows = orders.value.filter(
-    (order) => order.status === "completed" && payrollStatus(order.wageStatus) === "待发放"
-  );
-  if (!rows.length) {
+  const summaryRows = payrollSummaryRows.value;
+  if (!summaryRows.length) {
     antMessage.warning("暂无待发放薪资可导出");
     return;
   }
 
-  const summaryMap = new Map();
-  for (const order of rows) {
-    const account = order.assigneeAccount || "未分配账号";
-    const item = summaryMap.get(account) || {
-      account,
-      name: order.assigneeName || order.handler || "",
-      orderCount: 0,
-      recoveryAmount: 0,
-      afterSalesCommissionAmount: 0,
-      commissionAmount: 0,
-      recyclers: new Set(),
-      orderNumbers: [],
-      completedDates: []
-    };
-
-    item.name = item.name || order.assigneeName || order.handler || "";
-    item.orderCount += 1;
-    item.recoveryAmount += numberValue(order.recoveryAmount);
-    item.afterSalesCommissionAmount += numberValue(order.afterSalesCommissionAmount);
-    item.commissionAmount += numberValue(order.commissionAmount);
-    if (order.recycler) item.recyclers.add(order.recycler);
-    if (order.orderNumber) item.orderNumbers.push(order.orderNumber);
-    if (order.completedAt) item.completedDates.push(dateOnly(order.completedAt));
-    summaryMap.set(account, item);
-  }
-
-  const summaryRows = Array.from(summaryMap.values()).sort((a, b) => a.account.localeCompare(b.account));
-  const headers = ["员工账号", "员工姓名", "待发放订单数", "回收金额合计", "售后佣金合计", "工资金额合计", "回收人", "订单号列表", "完结日期"];
+  const headers = [
+    "员工账号",
+    "员工姓名",
+    "待发放订单数",
+    "本次有效订单数",
+    "历史已发有效单",
+    "上次结转有效单",
+    "本次额外奖励次数",
+    "本次额外奖励金额",
+    "本次结转有效单",
+    "回收金额合计",
+    "售后佣金合计",
+    "基础工资合计",
+    "本次应发合计",
+    "回收人",
+    "订单号列表",
+    "完结日期"
+  ];
   const lines = [
     headers.map(csvCell).join(","),
     ...summaryRows.map((item) => [
       item.account,
       item.name,
-      item.orderCount,
+      item.pendingOrderCount,
+      item.pendingEffectiveCount,
+      item.paidEffectiveCount,
+      item.carryInEffectiveCount,
+      item.bonusCount,
+      formatMoney(item.bonusAmount),
+      item.carryOutEffectiveCount,
       formatMoney(item.recoveryAmount),
       formatMoney(item.afterSalesCommissionAmount),
       formatMoney(item.commissionAmount),
+      formatMoney(item.payableAmount),
       Array.from(item.recyclers).join(" / "),
       item.orderNumbers.join(" / "),
       Array.from(new Set(item.completedDates)).join(" / ")
@@ -1412,6 +1509,44 @@ if (activeTab.value === "dashboard") loadDashboard();
           </Space>
         </template>
 
+        <div v-if="activeTab === 'history'" class="payroll-summary-panel">
+          <div class="payroll-summary-total">
+            <span>待发放 {{ payrollSummaryTotals.pendingOrderCount }} 单</span>
+            <span>有效 {{ payrollSummaryTotals.pendingEffectiveCount }} 单</span>
+            <span>额外奖励 {{ payrollSummaryTotals.bonusCount }} 次 / ¥{{ formatMoney(payrollSummaryTotals.bonusAmount) }}</span>
+            <strong>本次应发 ¥{{ formatMoney(payrollSummaryTotals.payableAmount) }}</strong>
+          </div>
+          <div v-if="payrollSummaryRows.length" class="payroll-summary-grid">
+            <div v-for="item in payrollSummaryRows" :key="item.account" class="payroll-summary-item">
+              <div>
+                <strong>{{ item.name || item.account }}</strong>
+                <span>{{ item.account }}</span>
+              </div>
+              <div>
+                <span>待发 / 有效</span>
+                <b>{{ item.pendingOrderCount }} / {{ item.pendingEffectiveCount }}</b>
+              </div>
+              <div>
+                <span>历史有效 / 结转</span>
+                <b>{{ item.paidEffectiveCount }} / {{ item.carryInEffectiveCount }}</b>
+              </div>
+              <div>
+                <span>额外奖励</span>
+                <b>{{ item.bonusCount }} 次 ¥{{ formatMoney(item.bonusAmount) }}</b>
+              </div>
+              <div>
+                <span>本次应发</span>
+                <b>¥{{ formatMoney(item.payableAmount) }}</b>
+              </div>
+              <div>
+                <span>下次结转</span>
+                <b>{{ item.carryOutEffectiveCount }} 单</b>
+              </div>
+            </div>
+          </div>
+          <div v-else class="payroll-summary-empty">暂无待发放薪资</div>
+        </div>
+
         <Table
           class="desktop-admin-table"
           :columns="columns"
@@ -1552,7 +1687,11 @@ if (activeTab.value === "dashboard") loadDashboard();
             </template>
 
             <template v-else-if="column.key === 'wageStatus'">
-              <Select v-model:value="record.wageStatus" style="width: 100%">
+              <Select
+                v-model:value="record.wageStatus"
+                :class="['wage-status-select', payrollStatus(record.wageStatus) === '已发放' ? 'paid' : 'pending']"
+                style="width: 100%"
+              >
                 <Select.Option v-for="item in WAGE_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
               </Select>
             </template>
