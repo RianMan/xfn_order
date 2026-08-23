@@ -63,6 +63,7 @@ const filters = reactive({
   assigneeAccount: undefined,
   difficulty: undefined,
   returnAddress: undefined,
+  orderTimeSort: "desc",
   paymentScreenshotDate: "",
   completedDate: ""
 });
@@ -228,9 +229,22 @@ const filteredOrders = computed(() => {
   });
 });
 
+function orderTimeValue(order) {
+  return String(order.receivedAt || order.appliedAt || order.createdAt || "");
+}
+
+const sortedOrders = computed(() => {
+  const direction = filters.orderTimeSort === "asc" ? 1 : -1;
+  return [...filteredOrders.value].sort((a, b) => {
+    const byOrderTime = orderTimeValue(a).localeCompare(orderTimeValue(b));
+    if (byOrderTime) return byOrderTime * direction;
+    return String(a.createdAt || "").localeCompare(String(b.createdAt || "")) * direction;
+  });
+});
+
 const pagedOrders = computed(() => {
   const start = (pager.current - 1) * pager.pageSize;
-  return filteredOrders.value.slice(start, start + pager.pageSize);
+  return sortedOrders.value.slice(start, start + pager.pageSize);
 });
 
 const pendingSelectedPayrollOrderIds = computed(() => {
@@ -1138,6 +1152,7 @@ function resetFilters() {
   filters.assigneeAccount = undefined;
   filters.difficulty = undefined;
   filters.returnAddress = undefined;
+  filters.orderTimeSort = "desc";
   filters.paymentScreenshotDate = "";
   filters.completedDate = "";
   pager.current = 1;
@@ -1478,6 +1493,15 @@ if (activeTab.value === "dashboard") loadDashboard();
               @change="pager.current = 1"
             >
               <Select.Option v-for="item in ADDRESS_OPTIONS" :key="item" :value="item">{{ item }}</Select.Option>
+            </Select>
+            <Select
+              v-model:value="filters.orderTimeSort"
+              placeholder="订单时间排序"
+              style="width: 160px"
+              @change="pager.current = 1"
+            >
+              <Select.Option value="desc">订单时间倒序</Select.Option>
+              <Select.Option value="asc">订单时间正序</Select.Option>
             </Select>
             <label class="date-filter-field">
               <span>收款截图日期</span>
