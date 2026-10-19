@@ -115,12 +115,19 @@ const visibleStaffOrders = computed(() => {
     : staffTab.value === "history"
       ? staffHistoryOrders.value
       : staffOrders.value;
-  return source.filter((order) => {
+  const filtered = source.filter((order) => {
     const statusOk = staffTab.value !== "mine" || !staffFilters.processStatus || order.processStatus === staffFilters.processStatus;
     const refundOk = staffTab.value !== "claimable" || !staffFilters.refundInfo || order.refundInfo === staffFilters.refundInfo;
     const keyword = staffFilters.orderNumber.trim().toLowerCase();
     const orderNumberOk = !keyword || String(order.orderNumber || "").toLowerCase().includes(keyword);
     return statusOk && refundOk && orderNumberOk;
+  });
+  if (staffTab.value === "history") return filtered;
+  return filtered.sort((a, b) => {
+    const timeA = String(a.receivedAt || a.appliedAt || a.createdAt || "");
+    const timeB = String(b.receivedAt || b.appliedAt || b.createdAt || "");
+    return timeB.localeCompare(timeA)
+      || String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
   });
 });
 
