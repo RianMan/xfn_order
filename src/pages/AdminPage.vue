@@ -1546,7 +1546,7 @@ if (activeTab.value === "dashboard") loadDashboard();
           </div>
           <div v-if="payrollSummaryRows.length" class="payroll-summary-grid">
             <div v-for="item in payrollSummaryRows" :key="item.account" class="payroll-summary-item">
-              <div>
+              <div class="payroll-summary-person">
                 <strong>{{ item.name || item.account }}</strong>
                 <span>{{ item.account }}</span>
               </div>

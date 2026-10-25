@@ -383,7 +383,7 @@ body {
 .payroll-summary-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
 }
 
 .payroll-summary-item {
@@ -392,14 +392,29 @@ body {
   border-radius: 8px;
   display: grid;
   gap: 8px;
-  grid-template-columns: 1.5fr repeat(5, minmax(82px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 10px;
 }
 
 .payroll-summary-item div {
+  align-content: start;
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.payroll-summary-item .payroll-summary-person {
+  align-items: baseline;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  grid-column: 1 / -1;
+  padding-bottom: 8px;
+}
+
+.payroll-summary-person span {
+  overflow-wrap: anywhere;
 }
 
 .payroll-summary-item span {
@@ -2483,6 +2498,10 @@ body {
 }
 
 @media (max-width: 520px) {
+  .payroll-summary-item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mobile-admin-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
