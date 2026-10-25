@@ -188,7 +188,7 @@ function readInviter(phone) {
   }
 }
 
-export async function queryUpstreamOrder(orderNo) {
+export async function queryUpstreamOrder(orderNo, { includeInviter = true } = {}) {
   const keyword = String(orderNo || "").trim();
   if (!keyword) return { success: false, msg: "请输入订单号" };
   if (!THIRD_PARTY_COOKIE) return { success: false, msg: "系统配置缺失，请联系管理员" };
@@ -236,7 +236,7 @@ export async function queryUpstreamOrder(orderNo) {
 
   const results = parseOrderQueryHtml(html).map((item) => ({
     ...item,
-    inviter: readInviter(item.phone)
+    inviter: includeInviter ? readInviter(item.phone) : ""
   }));
   return {
     success: true,

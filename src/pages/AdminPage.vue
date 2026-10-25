@@ -859,7 +859,7 @@ async function syncOrders() {
       body: JSON.stringify(importParams)
     });
     antMessage.success(
-      `翻页 ${data.pages?.length || 0} 页，${SYNC_STOP_TEXT[data.stoppedReason] || "同步完成"}；新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}`
+      `翻页 ${data.pages?.length || 0} 页，${SYNC_STOP_TEXT[data.stoppedReason] || "同步完成"}；新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}；补齐商品名 ${data.productNamesUpdated || 0}，商品查询未成功 ${data.productLookupFailed || 0}`
     );
     await loadOrders();
   } catch (err) {
@@ -1592,6 +1592,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                 </Button>
                 <span>{{ record.receivedAt }}</span>
                 <span>{{ record.shopName }}</span>
+                <span v-if="record.productName" class="order-product-name">商品：{{ record.productName }}</span>
                 <Tag v-if="record.difficultyLevel" color="red">难度 {{ record.difficultyLevel }}</Tag>
                 <div class="phone-tags">
                   <Tag v-for="phone in record.phones" :key="phone" color="blue" @click="copy(phone)">

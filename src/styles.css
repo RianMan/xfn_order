@@ -498,6 +498,12 @@ body {
   font-size: 12px;
 }
 
+.order-block .order-product-name {
+  color: #334155;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .phone-tags {
   display: flex;
   flex-wrap: wrap;
