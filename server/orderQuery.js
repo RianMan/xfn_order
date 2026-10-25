@@ -25,6 +25,13 @@ function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function parseProductPrice(value) {
+  const text = String(value ?? "").trim().replace(/^[¥￥]\s*/, "").replace(/,/g, "");
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return null;
+  const amount = Number(text);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
 function nearestBuyerCopyNode($, previewDiv) {
   const rowNode = $(previewDiv).closest("tr").find(".fuzhidingdan").first();
   if (rowNode.length) return rowNode;
@@ -143,6 +150,8 @@ function parseOrderQueryHtml(html) {
         productName: $(div).attr("data-spname") || "",
         productDesc: info.type || "",
         price: Number.parseFloat(info.jiage) || 0,
+        productPurchasePrice: parseProductPrice(info.jiage),
+        productSalePrice: parseProductPrice(cleanText($(div).closest("td").text()).match(/售价\s*[:：]\s*[¥￥]?\s*(\d[\d,]*(?:\.\d+)?)/)?.[1]),
         status: orderStatusLabel($, sourceId) || String(info.zt || ""),
         expressNos: expressNos.length ? [...expressNos] : fallbackExpressNos,
         expressCo: info.kdgs || "",

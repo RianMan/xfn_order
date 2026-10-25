@@ -1,7 +1,7 @@
 import { getDb, parseOrderRow, saveOrderRow } from "./db.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fetchProductNames } from "./productNames.js";
+import { fetchProductNames, missingProductDetails } from "./productNames.js";
 
 const MIN_RECEIVED_DATE = "2026-06-22 00:00:00";
 const DEFAULT_COMMISSION_AMOUNT = 3;
@@ -68,6 +68,8 @@ function normalizeOrder(order) {
   };
   return {
     productName: "",
+    productSalePrice: null,
+    productPurchasePrice: null,
     returnReason: "",
     shipped: "",
     returnTrackingNo: "",
@@ -134,7 +136,7 @@ async function backupOrdersBeforeImport(orders) {
 }
 
 export async function importOrders(incoming) {
-  const { names: productNames, failed: productLookupFailed } = await fetchProductNames(
+  const { details: productDetails, failed: productLookupFailed } = await fetchProductNames(
     incoming.filter(isAfterMinDate), await readOrders()
   );
   // Read again after network requests so staff changes made during lookup are preserved.
@@ -146,6 +148,7 @@ export async function importOrders(incoming) {
   let created = 0;
   let skippedDuplicate = 0;
   let productNamesUpdated = 0;
+  let productPricesUpdated = 0;
   let skippedOld = 0;
   let backupPath = "";
 
@@ -160,15 +163,17 @@ export async function importOrders(incoming) {
       .find((item) => item && existingKeys.has(item));
     if (duplicateKey) {
       const existing = existingById.get(existingKeys.get(duplicateKey));
-      const productName = productNames.get(String(order.orderNumber || "").trim());
-      if (existing && !existing.productName && productName && existing.orderNumber === order.orderNumber) {
+      const details = productDetails.get(String(order.orderNumber || "").trim());
+      if (existing && existing.orderNumber === order.orderNumber && Object.keys(missingProductDetails(existing, details)).length) {
         if (!backupPath) backupPath = await backupOrdersBeforeImport(existingOrders);
         const row = getDb().prepare("SELECT data_json FROM orders WHERE id = ?").get(existing.id);
         const current = row ? parseOrderRow(row) : null;
-        if (current && !current.productName) {
-          saveOrderRow({ ...current, productName });
-          existing.productName = productName;
-          productNamesUpdated += 1;
+        const patch = current ? missingProductDetails(current, details) : {};
+        if (Object.keys(patch).length) {
+          saveOrderRow({ ...current, ...patch });
+          Object.assign(existing, patch);
+          if (patch.productName) productNamesUpdated += 1;
+          if ("productSalePrice" in patch || "productPurchasePrice" in patch) productPricesUpdated += 1;
         }
       }
       skippedDuplicate += 1;
@@ -179,7 +184,7 @@ export async function importOrders(incoming) {
 
     const createdOrder = normalizeOrder({
       ...order,
-      productName: productNames.get(String(order.orderNumber || "").trim()) || "",
+      ...missingProductDetails(order, productDetails.get(String(order.orderNumber || "").trim())),
       importKey: order.orderNumber,
       id: crypto.randomUUID(),
       syncedAt: new Date().toISOString(),
@@ -194,7 +199,7 @@ export async function importOrders(incoming) {
   }
 
   const total = getDb().prepare("SELECT COUNT(*) AS count FROM orders").get().count;
-  return { created, skippedDuplicate, skippedOld, total, backupPath, productNamesUpdated, productLookupFailed };
+  return { created, skippedDuplicate, skippedOld, total, backupPath, productNamesUpdated, productPricesUpdated, productLookupFailed };
 }
 
 function filterOrdersByScope(orders, scope = "active") {

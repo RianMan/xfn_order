@@ -850,6 +850,10 @@ async function submitStaffEdit() {
   }
 }
 
+function formatProductPrice(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? `¥${value.toFixed(2)}` : "—";
+}
+
 async function syncOrders() {
   loading.value = true;
   globalLoadingText.value = "正在同步第三方订单，请稍候";
@@ -859,7 +863,7 @@ async function syncOrders() {
       body: JSON.stringify(importParams)
     });
     antMessage.success(
-      `翻页 ${data.pages?.length || 0} 页，${SYNC_STOP_TEXT[data.stoppedReason] || "同步完成"}；新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}；补齐商品名 ${data.productNamesUpdated || 0}，商品查询未成功 ${data.productLookupFailed || 0}`
+      `翻页 ${data.pages?.length || 0} 页，${SYNC_STOP_TEXT[data.stoppedReason] || "同步完成"}；新增 ${data.created}，重复跳过 ${data.skippedDuplicate}，旧数据跳过 ${data.skippedOld}；补齐商品名 ${data.productNamesUpdated || 0}，补齐价格 ${data.productPricesUpdated || 0}，商品查询未成功 ${data.productLookupFailed || 0}`
     );
     await loadOrders();
   } catch (err) {
@@ -1593,6 +1597,7 @@ if (activeTab.value === "dashboard") loadDashboard();
                 <span>{{ record.receivedAt }}</span>
                 <span>{{ record.shopName }}</span>
                 <span v-if="record.productName" class="order-product-name">商品：{{ record.productName }}</span>
+                <span class="order-product-prices">售价：{{ formatProductPrice(record.productSalePrice) }} · 收价：{{ formatProductPrice(record.productPurchasePrice) }}</span>
                 <Tag v-if="record.difficultyLevel" color="red">难度 {{ record.difficultyLevel }}</Tag>
                 <div class="phone-tags">
                   <Tag v-for="phone in record.phones" :key="phone" color="blue" @click="copy(phone)">
