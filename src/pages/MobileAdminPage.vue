@@ -484,7 +484,7 @@ async function completeUpstream(record) {
   if (!record) return;
   if (!window.confirm(`确认把订单 ${record.orderNumber} 标记为已完结吗？`)) return;
 
-  globalLoadingText.value = "正在完结订单并同步远程数据，请稍候";
+  globalLoadingText.value = "正在完结当前订单，请稍候";
   try {
     const data = await request(`/api/admin/orders/${record.id}/upstream-complete`, {
       method: "POST",
@@ -492,7 +492,7 @@ async function completeUpstream(record) {
     });
     const index = orders.value.findIndex((item) => item.id === data.order?.id);
     if (index >= 0) orders.value[index] = data.order;
-    showNotice(`已完结并同步，新增 ${data.sync?.created ?? 0} 条`);
+    showNotice("当前订单已完结");
     await loadOrders();
   } catch (err) {
     showNotice(err.message || "完结失败");

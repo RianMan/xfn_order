@@ -14,7 +14,8 @@
     "start": "node --no-warnings server/index.js",
     "sync:orders": "node --no-warnings server/sync.js",
     "test:parser": "node --no-warnings server/parser.test.js",
-    "test:products": "node --no-warnings server/productNames.test.js"
+    "test:products": "node --no-warnings server/productNames.test.js",
+    "test:complete": "node --no-warnings server/upstreamComplete.test.js"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",

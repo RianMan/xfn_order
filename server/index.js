@@ -418,18 +418,7 @@ app.post("/api/admin/orders/:id/upstream-complete", requireSuperAdmin, async (re
       commissionAmount: Number.isFinite(Number(commissionSource)) ? Number(commissionSource) : 3,
       completedAt: new Date().toISOString()
     });
-    const { orders: remoteOrders, pages, stoppedReason } = await fetchThirdPartyOrderPages({});
-    const syncResult = await importOrders(remoteOrders);
-
-    res.json({
-      order: updatedOrder,
-      sync: {
-        ...syncResult,
-        imported: remoteOrders.length,
-        pages,
-        stoppedReason
-      }
-    });
+    res.json({ order: updatedOrder });
   } catch (err) {
     res.status(502).json({ message: err.message || "上游完结失败" });
   }
