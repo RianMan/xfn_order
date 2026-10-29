@@ -25,8 +25,6 @@ import { normalizeImageFile } from "../imageUpload.js";
 const { TextArea } = Input;
 const WAGE_OPTIONS = ["待发放", "已发放"];
 const EFFECTIVE_ORDER_COMMISSION_THRESHOLD = 3;
-const BONUS_ORDER_STEP = 6;
-const BONUS_AMOUNT = 10;
 const ROLE_OPTIONS = [
   { value: "operator", label: "操作员" },
   { value: "admin", label: "admin" }
@@ -513,13 +511,9 @@ function createPayrollSummaryItem(order) {
     pendingOrderCount: 0,
     pendingEffectiveCount: 0,
     paidEffectiveCount: 0,
-    carryInEffectiveCount: 0,
-    bonusCount: 0,
-    carryOutEffectiveCount: 0,
     recoveryAmount: 0,
     afterSalesCommissionAmount: 0,
     commissionAmount: 0,
-    bonusAmount: 0,
     payableAmount: 0,
     recyclers: new Set(),
     orderNumbers: [],
@@ -556,36 +550,19 @@ const payrollSummaryRows = computed(() => {
 
   return Array.from(summaryMap.values())
     .filter((item) => item.pendingOrderCount > 0)
-    .map((item) => {
-      const carryInEffectiveCount = item.paidEffectiveCount % BONUS_ORDER_STEP;
-      const bonusCount = Math.floor((carryInEffectiveCount + item.pendingEffectiveCount) / BONUS_ORDER_STEP);
-      const carryOutEffectiveCount = (carryInEffectiveCount + item.pendingEffectiveCount) % BONUS_ORDER_STEP;
-      const bonusAmount = bonusCount * BONUS_AMOUNT;
-      return {
-        ...item,
-        carryInEffectiveCount,
-        bonusCount,
-        carryOutEffectiveCount,
-        bonusAmount,
-        payableAmount: item.commissionAmount + bonusAmount
-      };
-    })
+    .map((item) => ({ ...item, payableAmount: item.commissionAmount }))
     .sort((a, b) => a.account.localeCompare(b.account));
 });
 
 const payrollSummaryTotals = computed(() => payrollSummaryRows.value.reduce((total, item) => ({
   pendingOrderCount: total.pendingOrderCount + item.pendingOrderCount,
   pendingEffectiveCount: total.pendingEffectiveCount + item.pendingEffectiveCount,
-  bonusCount: total.bonusCount + item.bonusCount,
   commissionAmount: total.commissionAmount + item.commissionAmount,
-  bonusAmount: total.bonusAmount + item.bonusAmount,
   payableAmount: total.payableAmount + item.payableAmount
 }), {
   pendingOrderCount: 0,
   pendingEffectiveCount: 0,
-  bonusCount: 0,
   commissionAmount: 0,
-  bonusAmount: 0,
   payableAmount: 0
 }));
 
@@ -602,10 +579,6 @@ function exportPendingPayroll() {
     "待发放订单数",
     "本次有效订单数",
     "历史已发有效单",
-    "上次结转有效单",
-    "本次额外奖励次数",
-    "本次额外奖励金额",
-    "本次结转有效单",
     "回收金额合计",
     "售后佣金合计",
     "基础工资合计",
@@ -622,10 +595,6 @@ function exportPendingPayroll() {
       item.pendingOrderCount,
       item.pendingEffectiveCount,
       item.paidEffectiveCount,
-      item.carryInEffectiveCount,
-      item.bonusCount,
-      formatMoney(item.bonusAmount),
-      item.carryOutEffectiveCount,
       formatMoney(item.recoveryAmount),
       formatMoney(item.afterSalesCommissionAmount),
       formatMoney(item.commissionAmount),
@@ -1541,7 +1510,6 @@ if (activeTab.value === "dashboard") loadDashboard();
           <div class="payroll-summary-total">
             <span>待发放 {{ payrollSummaryTotals.pendingOrderCount }} 单</span>
             <span>有效 {{ payrollSummaryTotals.pendingEffectiveCount }} 单</span>
-            <span>额外奖励 {{ payrollSummaryTotals.bonusCount }} 次 / ¥{{ formatMoney(payrollSummaryTotals.bonusAmount) }}</span>
             <strong>本次应发 ¥{{ formatMoney(payrollSummaryTotals.payableAmount) }}</strong>
           </div>
           <div v-if="payrollSummaryRows.length" class="payroll-summary-grid">
@@ -1555,20 +1523,12 @@ if (activeTab.value === "dashboard") loadDashboard();
                 <b>{{ item.pendingOrderCount }} / {{ item.pendingEffectiveCount }}</b>
               </div>
               <div>
-                <span>历史有效 / 结转</span>
-                <b>{{ item.paidEffectiveCount }} / {{ item.carryInEffectiveCount }}</b>
-              </div>
-              <div>
-                <span>额外奖励</span>
-                <b>{{ item.bonusCount }} 次 ¥{{ formatMoney(item.bonusAmount) }}</b>
+                <span>历史有效</span>
+                <b>{{ item.paidEffectiveCount }}</b>
               </div>
               <div>
                 <span>本次应发</span>
                 <b>¥{{ formatMoney(item.payableAmount) }}</b>
-              </div>
-              <div>
-                <span>下次结转</span>
-                <b>{{ item.carryOutEffectiveCount }} 单</b>
               </div>
             </div>
           </div>
